@@ -1,6 +1,7 @@
 import { Server } from "socket.io";
 import type { Server as HttpServer } from "node:http";
 import { config } from "../config/index";
+import { registerMediasoupHandlers } from "./mediasoupHandler";
 import { registerRoomHandlers } from "./roomHandler";
 import type {
   ClientToServerEvents,
@@ -22,6 +23,7 @@ export function createSocketServer(httpServer: HttpServer) {
     },
   });
 
+  registerMediasoupHandlers(io);
   registerRoomHandlers(io);
 
   console.log("Socket.IO server initialized");

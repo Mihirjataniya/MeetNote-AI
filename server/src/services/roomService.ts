@@ -1,5 +1,5 @@
 import crypto from "node:crypto";
-import { Room, Participant, ParticipantInfo } from "../types/index";
+import { Room, Participant, ParticipantInfo, PeerMedia } from "../types/index";
 
 class RoomService {
   private rooms: Map<string, Room> = new Map();
@@ -10,6 +10,8 @@ class RoomService {
       roomId,
       participants: new Map(),
       createdAt: new Date(),
+      router: null,
+      peerMedia: new Map(),
     };
     this.rooms.set(roomId, room);
     return room;
@@ -36,6 +38,25 @@ class RoomService {
     return participant;
   }
 
+  cleanupPeerMedia(roomId: string, socketId: string): void {
+    const room = this.rooms.get(roomId);
+    if (!room) return;
+
+    const media = room.peerMedia.get(socketId);
+    if (!media) return;
+
+    for (const consumer of media.consumers.values()) {
+      consumer.close();
+    }
+    for (const producer of media.producers.values()) {
+      producer.close();
+    }
+    media.sendTransport?.close();
+    media.recvTransport?.close();
+
+    room.peerMedia.delete(socketId);
+  }
+
   removeParticipant(
     roomId: string,
     socketId: string
@@ -46,9 +67,11 @@ class RoomService {
     const participant = room.participants.get(socketId);
     if (!participant) return undefined;
 
+    this.cleanupPeerMedia(roomId, socketId);
     room.participants.delete(socketId);
 
     if (room.participants.size === 0) {
+      room.router?.close();
       this.rooms.delete(roomId);
     }
 

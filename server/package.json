@@ -2,11 +2,12 @@
   "name": "meetnote-server",
   "version": "1.0.0",
   "description": "MeetNote backend server",
+  "type": "module",
   "main": "dist/index.js",
   "scripts": {
     "dev": "nodemon",
     "build": "tsc",
-    "start": "node dist/index.js"
+    "start": "tsx src/index.ts"
   },
   "keywords": [],
   "license": "ISC",
@@ -14,6 +15,7 @@
     "cors": "^2.8.6",
     "dotenv": "^17.4.2",
     "express": "^5.2.1",
+    "mediasoup": "^3.19.22",
     "socket.io": "^4.8.3"
   },
   "devDependencies": {
@@ -21,7 +23,8 @@
     "@types/express": "^5.0.6",
     "@types/node": "^25.7.0",
     "nodemon": "^3.1.14",
-    "ts-node": "^10.9.2",
+    "socket.io-client": "^4.8.3",
+    "tsx": "^4.21.0",
     "typescript": "^6.0.3"
   }
 }

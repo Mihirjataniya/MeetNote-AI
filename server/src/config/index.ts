@@ -14,6 +14,13 @@ export const config = {
   cors: {
     origin: process.env.CORS_ORIGIN || "*",
   },
+  mongodb: {
+    uri: process.env.MONGODB_URI || "mongodb://localhost:27017/meetnote",
+  },
+  jwt: {
+    secret: process.env.JWT_SECRET || "dev-secret-change-in-production",
+    expiresIn: process.env.JWT_EXPIRES_IN || "7d" as const,
+  },
   mediasoup: {
     worker: {
       logLevel: "warn" as WorkerLogLevel,

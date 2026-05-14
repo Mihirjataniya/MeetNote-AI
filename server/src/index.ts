@@ -1,10 +1,12 @@
 import express from "express";
 import cors from "cors";
+import mongoose from "mongoose";
 import { createServer } from "node:http";
 import { config } from "./config/index";
 import apiRoutes from "./routes/index";
 import { createSocketServer } from "./socket/index";
 import { mediasoupService } from "./services/mediasoupService";
+import { connectDatabase } from "./db/index";
 
 async function main() {
   const app = express();
@@ -16,6 +18,7 @@ async function main() {
 
   const httpServer = createServer(app);
 
+  await connectDatabase();
   await mediasoupService.initialize();
 
   createSocketServer(httpServer);
@@ -27,6 +30,7 @@ async function main() {
   const shutdown = async () => {
     console.log("Shutting down...");
     await mediasoupService.closeWorker();
+    await mongoose.disconnect();
     httpServer.close();
     process.exit(0);
   };

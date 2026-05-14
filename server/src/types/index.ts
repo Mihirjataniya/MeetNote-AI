@@ -14,6 +14,34 @@ export interface ServerConfig {
   nodeEnv: string;
 }
 
+// --- Auth types ---
+
+export interface RegisterPayload {
+  email: string;
+  password: string;
+  displayName: string;
+}
+
+export interface LoginPayload {
+  email: string;
+  password: string;
+}
+
+export interface AuthResponse {
+  token: string;
+  user: {
+    id: string;
+    email: string;
+    displayName: string;
+  };
+}
+
+export interface JwtPayload {
+  userId: string;
+  email: string;
+  displayName: string;
+}
+
 // --- Domain types ---
 
 export interface Participant {
@@ -45,13 +73,10 @@ export interface ParticipantInfo {
 
 // --- Socket.IO payload types ---
 
-export interface CreateRoomPayload {
-  displayName: string;
-}
+export interface CreateRoomPayload {}
 
 export interface JoinRoomPayload {
   roomId: string;
-  displayName: string;
 }
 
 export interface LeaveRoomPayload {
@@ -210,6 +235,8 @@ export interface ServerToClientEvents {
 export interface InterServerEvents {}
 
 export interface SocketData {
+  userId: string;
   displayName: string;
+  email: string;
   rooms: Set<string>;
 }

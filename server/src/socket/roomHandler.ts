@@ -20,26 +20,20 @@ type TypedSocket = Socket<
   SocketData
 >;
 
-function isValidDisplayName(name: unknown): name is string {
-  return typeof name === "string" && name.trim().length > 0 && name.length <= 50;
-}
-
 export function registerRoomHandlers(io: TypedServer): void {
   io.on("connection", (socket: TypedSocket) => {
-    console.log(`Client connected: ${socket.id}`);
+    console.log(`Client connected: ${socket.id} (${socket.data.displayName})`);
     socket.data.rooms = new Set();
 
-    socket.on("create-room", (payload, callback) => {
+    socket.on("create-room", (_payload, callback) => {
       try {
-        if (!isValidDisplayName(payload?.displayName)) {
-          callback({ message: "Display name is required (max 50 characters)" });
-          return;
-        }
-
         const room = roomService.createRoom();
-        roomService.addParticipant(room.roomId, socket.id, payload.displayName);
+        roomService.addParticipant(
+          room.roomId,
+          socket.id,
+          socket.data.displayName
+        );
         socket.join(room.roomId);
-        socket.data.displayName = payload.displayName;
         socket.data.rooms.add(room.roomId);
 
         callback({
@@ -53,11 +47,6 @@ export function registerRoomHandlers(io: TypedServer): void {
 
     socket.on("join-room", (payload, callback) => {
       try {
-        if (!isValidDisplayName(payload?.displayName)) {
-          callback({ message: "Display name is required (max 50 characters)" });
-          return;
-        }
-
         if (!payload?.roomId || typeof payload.roomId !== "string") {
           callback({ message: "Room ID is required" });
           return;
@@ -77,7 +66,7 @@ export function registerRoomHandlers(io: TypedServer): void {
         const participant = roomService.addParticipant(
           payload.roomId,
           socket.id,
-          payload.displayName
+          socket.data.displayName
         );
         if (!participant) {
           callback({ message: "Failed to join room" });
@@ -85,14 +74,13 @@ export function registerRoomHandlers(io: TypedServer): void {
         }
 
         socket.join(payload.roomId);
-        socket.data.displayName = payload.displayName;
         socket.data.rooms.add(payload.roomId);
 
         socket.to(payload.roomId).emit("peer-joined", {
           roomId: payload.roomId,
           peer: {
             socketId: socket.id,
-            displayName: payload.displayName,
+            displayName: socket.data.displayName,
             joinedAt: participant.joinedAt.toISOString(),
           },
         });
@@ -110,7 +98,10 @@ export function registerRoomHandlers(io: TypedServer): void {
       try {
         if (!payload?.roomId) return;
 
-        const removed = roomService.removeParticipant(payload.roomId, socket.id);
+        const removed = roomService.removeParticipant(
+          payload.roomId,
+          socket.id
+        );
         if (!removed) return;
 
         socket.leave(payload.roomId);

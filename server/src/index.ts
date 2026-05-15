@@ -7,10 +7,13 @@ import apiRoutes from "./routes/index";
 import { createSocketServer } from "./socket/index";
 import { mediasoupService } from "./services/mediasoupService";
 import { connectDatabase } from "./db/index";
+import dns from "node:dns/promises";
+
+// [ '127.0.0.53' ]
 
 async function main() {
   const app = express();
-
+  dns.setServers(["1.1.1.1"]);
   app.use(cors());
   app.use(express.json());
 

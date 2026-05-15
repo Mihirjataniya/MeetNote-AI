@@ -1,343 +1,95 @@
-* {
+@import "tailwindcss";
+
+/* --- Dark mode via .dark class (set by useTheme hook) --- */
+@variant dark (&:where(.dark, .dark *));
+
+/* --- Design tokens → Tailwind utilities --- */
+@theme {
+  --color-background: var(--background);
+  --color-surface: var(--surface);
+  --color-surface-hover: var(--surface-hover);
+  --color-surface-muted: var(--surface-muted);
+
+  --color-foreground: var(--foreground);
+  --color-secondary: var(--secondary);
+  --color-tertiary: var(--tertiary);
+  --color-muted: var(--muted);
+
+  --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
+  --color-border-focused: var(--border-focused);
+
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+
+  --color-success: var(--success);
+  --color-error: var(--error);
+
+  --font-sans: "Inter", system-ui, -apple-system, sans-serif;
+  --font-display: "Inter Tight", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, monospace;
+  --font-serif: "Georgia", serif;
+}
+
+/* --- Light theme (default) --- */
+:root {
+  --background: #fafafa;
+  --surface: #ffffff;
+  --surface-hover: #f5f5f4;
+  --surface-muted: #efeeec;
+
+  --foreground: #111111;
+  --secondary: #666666;
+  --tertiary: #9a9a98;
+  --muted: #b8b7b4;
+
+  --border: rgba(0, 0, 0, 0.06);
+  --border-strong: rgba(0, 0, 0, 0.09);
+  --border-focused: rgba(0, 0, 0, 0.14);
+
+  --accent: #111111;
+  --accent-foreground: #ffffff;
+
+  --success: #16a34a;
+  --error: #c2410c;
+}
+
+/* --- Dark theme --- */
+.dark {
+  --background: #0a0a0a;
+  --surface: #141414;
+  --surface-hover: #1e1e1e;
+  --surface-muted: #262626;
+
+  --foreground: #ededed;
+  --secondary: #a0a0a0;
+  --tertiary: #6b6b6b;
+  --muted: #454545;
+
+  --border: rgba(255, 255, 255, 0.06);
+  --border-strong: rgba(255, 255, 255, 0.10);
+  --border-focused: rgba(255, 255, 255, 0.16);
+
+  --accent: #ededed;
+  --accent-foreground: #111111;
+
+  --success: #22c55e;
+  --error: #ea580c;
+}
+
+/* --- Base reset --- */
+*,
+*::before,
+*::after {
   margin: 0;
   padding: 0;
   box-sizing: border-box;
 }
 
 body {
-  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  background: #0f0f0f;
-  color: #e0e0e0;
-}
-
-.app {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  min-height: 100vh;
-  padding: 2rem;
-}
-
-.app h1 {
-  font-size: 2rem;
-  font-weight: 700;
-  margin-bottom: 1.5rem;
-}
-
-/* App Header */
-
-.app-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  width: 100%;
-  max-width: 1000px;
-  margin-bottom: 1.5rem;
-}
-
-.app-header h1 {
-  margin-bottom: 0;
-}
-
-.user-bar {
-  display: flex;
-  align-items: center;
-  gap: 0.8rem;
-}
-
-.user-name {
-  font-size: 0.9rem;
-  color: #aaa;
-}
-
-.btn-small {
-  padding: 0.4rem 0.8rem;
-  border: 1px solid #444;
-  border-radius: 6px;
-  background: transparent;
-  color: #ccc;
-  font-size: 0.8rem;
-  cursor: pointer;
-}
-
-.btn-small:hover {
-  border-color: #888;
-  color: #fff;
-}
-
-.loading-text {
-  color: #666;
-  font-size: 1rem;
-}
-
-/* Auth Page */
-
-.auth-page {
-  background: #1a1a1a;
-  border-radius: 12px;
-  padding: 2rem;
-  width: 100%;
-  max-width: 420px;
-}
-
-.auth-page h2 {
-  font-size: 1.3rem;
-  margin-bottom: 1.2rem;
-}
-
-.auth-page form {
-  display: flex;
-  flex-direction: column;
-  gap: 0.8rem;
-}
-
-.auth-page input {
-  padding: 0.7rem 1rem;
-  border: 1px solid #333;
-  border-radius: 8px;
-  background: #111;
-  color: #e0e0e0;
-  font-size: 0.95rem;
-}
-
-.auth-page input:focus {
-  outline: none;
-  border-color: #5c6bc0;
-}
-
-.auth-toggle {
-  margin-top: 1.2rem;
-  font-size: 0.85rem;
-  color: #888;
-  text-align: center;
-}
-
-.link-btn {
-  background: none;
-  border: none;
-  color: #5c6bc0;
-  cursor: pointer;
-  font-size: 0.85rem;
-  text-decoration: underline;
-}
-
-.link-btn:hover {
-  color: #7986cb;
-}
-
-/* Join Form */
-
-.join-form {
-  background: #1a1a1a;
-  border-radius: 12px;
-  padding: 2rem;
-  width: 100%;
-  max-width: 420px;
-}
-
-.join-form h2 {
-  font-size: 1.3rem;
-  margin-bottom: 1rem;
-}
-
-.connection-status {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  font-size: 0.85rem;
-  color: #888;
-  margin-bottom: 1.2rem;
-}
-
-.status-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: #555;
-}
-
-.status-dot.connected {
-  background: #4caf50;
-}
-
-.join-form form {
-  display: flex;
-  flex-direction: column;
-  gap: 0.8rem;
-}
-
-.join-form input {
-  padding: 0.7rem 1rem;
-  border: 1px solid #333;
-  border-radius: 8px;
-  background: #111;
-  color: #e0e0e0;
-  font-size: 0.95rem;
-}
-
-.join-form input:focus {
-  outline: none;
-  border-color: #5c6bc0;
-}
-
-.mode-tabs {
-  display: flex;
-  gap: 0.5rem;
-}
-
-.mode-tabs button {
-  flex: 1;
-  padding: 0.5rem;
-  border: 1px solid #333;
-  border-radius: 8px;
-  background: transparent;
-  color: #888;
-  cursor: pointer;
-  font-size: 0.85rem;
-}
-
-.mode-tabs button.active {
-  background: #5c6bc0;
-  color: #fff;
-  border-color: #5c6bc0;
-}
-
-.btn-primary {
-  padding: 0.7rem 1.2rem;
-  border: none;
-  border-radius: 8px;
-  background: #5c6bc0;
-  color: #fff;
-  font-size: 0.95rem;
-  cursor: pointer;
-}
-
-.btn-primary:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.btn-danger {
-  padding: 0.7rem 1.2rem;
-  border: none;
-  border-radius: 8px;
-  background: #c62828;
-  color: #fff;
-  font-size: 0.95rem;
-  cursor: pointer;
-}
-
-.error-message {
-  color: #ef5350;
-  font-size: 0.85rem;
-  margin-top: 0.8rem;
-}
-
-/* Room */
-
-.room {
-  width: 100%;
-  max-width: 1000px;
-}
-
-.room-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 1rem;
-  margin-bottom: 1.5rem;
-}
-
-.room-info {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-}
-
-.room-id {
-  font-family: monospace;
-  font-size: 0.9rem;
-  color: #aaa;
-  cursor: pointer;
-  padding: 0.3rem 0.6rem;
-  background: #1a1a1a;
-  border-radius: 6px;
-}
-
-.room-id:hover {
-  color: #fff;
-}
-
-.copied-toast {
-  font-size: 0.8rem;
-  color: #4caf50;
-}
-
-.room-actions {
-  display: flex;
-  gap: 0.5rem;
-}
-
-/* Video Grid */
-
-.video-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-  gap: 1rem;
-  margin-bottom: 1.5rem;
-}
-
-.video-container {
-  position: relative;
-  background: #111;
-  border-radius: 10px;
-  overflow: hidden;
-  aspect-ratio: 16 / 9;
-}
-
-.video-container video {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
-.video-label {
-  position: absolute;
-  bottom: 8px;
-  left: 10px;
-  font-size: 0.8rem;
-  background: rgba(0, 0, 0, 0.6);
-  padding: 0.2rem 0.5rem;
-  border-radius: 4px;
-}
-
-.video-local {
-  border: 2px solid #5c6bc0;
-}
-
-/* Participants */
-
-.participants-list {
-  background: #1a1a1a;
-  border-radius: 10px;
-  padding: 1rem 1.5rem;
-}
-
-.participants-list h3 {
-  font-size: 0.95rem;
-  margin-bottom: 0.5rem;
-  color: #aaa;
-}
-
-.participants-list ul {
-  list-style: none;
-}
-
-.participants-list li {
-  padding: 0.3rem 0;
-  font-size: 0.9rem;
-  color: #ccc;
+  background: var(--background);
+  color: var(--foreground);
 }

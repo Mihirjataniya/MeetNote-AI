@@ -1,5 +1,6 @@
 import { Server, Socket } from "socket.io";
 import { roomService } from "../services/roomService";
+import { meetingService } from "../services/meetingService";
 import type {
   ClientToServerEvents,
   ServerToClientEvents,
@@ -25,7 +26,7 @@ export function registerRoomHandlers(io: TypedServer): void {
     console.log(`Client connected: ${socket.id} (${socket.data.displayName})`);
     socket.data.rooms = new Set();
 
-    socket.on("create-room", (_payload, callback) => {
+    socket.on("create-room", async (payload, callback) => {
       try {
         const room = roomService.createRoom();
         roomService.addParticipant(
@@ -35,6 +36,14 @@ export function registerRoomHandlers(io: TypedServer): void {
         );
         socket.join(room.roomId);
         socket.data.rooms.add(room.roomId);
+
+        const meetingId = await meetingService.createMeeting(
+          room.roomId,
+          socket.data.userId,
+          socket.data.displayName,
+          { title: payload?.title, agenda: payload?.agenda }
+        );
+        if (meetingId) room.meetingId = meetingId;
 
         callback({
           roomId: room.roomId,
@@ -76,6 +85,14 @@ export function registerRoomHandlers(io: TypedServer): void {
         socket.join(payload.roomId);
         socket.data.rooms.add(payload.roomId);
 
+        if (room.meetingId) {
+          meetingService.addParticipant(
+            room.meetingId,
+            socket.data.userId,
+            socket.data.displayName
+          );
+        }
+
         socket.to(payload.roomId).emit("peer-joined", {
           roomId: payload.roomId,
           peer: {
@@ -98,6 +115,9 @@ export function registerRoomHandlers(io: TypedServer): void {
       try {
         if (!payload?.roomId) return;
 
+        const room = roomService.getRoom(payload.roomId);
+        const meetingId = room?.meetingId;
+
         const removed = roomService.removeParticipant(
           payload.roomId,
           socket.id
@@ -106,6 +126,14 @@ export function registerRoomHandlers(io: TypedServer): void {
 
         socket.leave(payload.roomId);
         socket.data.rooms.delete(payload.roomId);
+
+        if (meetingId) {
+          if (!roomService.getRoom(payload.roomId)) {
+            meetingService.endMeeting(meetingId);
+          } else {
+            meetingService.removeParticipant(meetingId, socket.data.userId);
+          }
+        }
 
         socket.to(payload.roomId).emit("peer-left", {
           roomId: payload.roomId,
@@ -143,8 +171,19 @@ export function registerRoomHandlers(io: TypedServer): void {
       console.log(`Client disconnected: ${socket.id}, reason: ${reason}`);
 
       for (const roomId of socket.data.rooms) {
+        const room = roomService.getRoom(roomId);
+        const meetingId = room?.meetingId;
+
         const removed = roomService.removeParticipant(roomId, socket.id);
         if (removed) {
+          if (meetingId) {
+            if (!roomService.getRoom(roomId)) {
+              meetingService.endMeeting(meetingId);
+            } else {
+              meetingService.removeParticipant(meetingId, socket.data.userId);
+            }
+          }
+
           socket.to(roomId).emit("peer-left", {
             roomId,
             socketId: socket.id,

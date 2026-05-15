@@ -8,7 +8,10 @@ import type { ParticipantInfo } from "./room.types";
 
 // --- Room event payloads ---
 
-export interface CreateRoomPayload {}
+export interface CreateRoomPayload {
+  title?: string;
+  agenda?: string;
+}
 
 export interface JoinRoomPayload {
   roomId: string;

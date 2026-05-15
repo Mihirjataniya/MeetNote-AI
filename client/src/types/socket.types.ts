@@ -13,8 +13,10 @@ export interface ParticipantInfo {
   joinedAt: string;
 }
 
-// eslint-disable-next-line @typescript-eslint/no-empty-object-type
-export interface CreateRoomPayload {}
+export interface CreateRoomPayload {
+  title?: string;
+  agenda?: string;
+}
 
 export interface JoinRoomPayload {
   roomId: string;

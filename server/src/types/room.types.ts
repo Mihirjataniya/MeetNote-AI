@@ -20,6 +20,7 @@ export interface PeerMedia {
 
 export interface Room {
   roomId: string;
+  meetingId: string | null;
   participants: Map<string, Participant>;
   createdAt: Date;
   router: Router | null;

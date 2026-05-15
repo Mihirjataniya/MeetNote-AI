@@ -8,6 +8,7 @@ class RoomService {
     const roomId = crypto.randomUUID();
     const room: Room = {
       roomId,
+      meetingId: null,
       participants: new Map(),
       createdAt: new Date(),
       router: null,

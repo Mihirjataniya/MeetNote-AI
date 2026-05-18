@@ -10,19 +10,30 @@ function MeetingApp() {
   const { roomId } = useRoom();
 
   return (
-    <div className="app">
-      <header className="app-header">
-        <h1>MeetNote</h1>
+    <div className="h-full flex flex-col bg-background">
+      <header className="h-14 px-7 flex items-center gap-4 border-b border-border bg-background">
+        <span className="inline-flex items-center gap-2.5 font-semibold text-[15px] tracking-tight text-foreground">
+          <span className="w-[22px] h-[22px] rounded-[6px] bg-accent text-accent-foreground inline-flex items-center justify-center font-display text-[13px] font-bold">
+            M
+          </span>
+          MeetNote
+        </span>
+        <div className="flex-1" />
         {user && (
-          <div className="user-bar">
-            <span className="user-name">{user.displayName}</span>
-            <button className="btn-small" onClick={logout}>
+          <div className="flex items-center gap-3">
+            <span className="text-[13px] font-medium text-foreground">{user.displayName}</span>
+            <button
+              onClick={logout}
+              className="h-[30px] px-3 text-[13px] font-medium rounded-lg border border-border-strong bg-surface text-foreground hover:bg-surface-hover transition-colors"
+            >
               Logout
             </button>
           </div>
         )}
       </header>
-      {roomId ? <Room /> : <JoinForm />}
+      <div className="flex-1 overflow-auto">
+        {roomId ? <Room /> : <JoinForm />}
+      </div>
     </div>
   );
 }
@@ -32,20 +43,22 @@ function AuthGate() {
 
   if (loading) {
     return (
-      <div className="app">
-        <h1>MeetNote</h1>
-        <p className="loading-text">Loading...</p>
+      <div className="h-full flex items-center justify-center bg-background">
+        <div className="text-center">
+          <span className="inline-flex items-center gap-2.5 font-semibold text-[15px] tracking-tight text-foreground">
+            <span className="w-[22px] h-[22px] rounded-[6px] bg-accent text-accent-foreground inline-flex items-center justify-center font-display text-[13px] font-bold">
+              M
+            </span>
+            MeetNote
+          </span>
+          <p className="mt-4 text-[14px] text-secondary">Loading...</p>
+        </div>
       </div>
     );
   }
 
   if (!user) {
-    return (
-      <div className="app">
-        <h1>MeetNote</h1>
-        <AuthPage />
-      </div>
-    );
+    return <AuthPage />;
   }
 
   return (

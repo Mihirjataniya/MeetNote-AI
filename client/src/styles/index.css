@@ -1,9 +1,7 @@
 @import "tailwindcss";
 
-/* --- Dark mode via .dark class (set by useTheme hook) --- */
 @variant dark (&:where(.dark, .dark *));
 
-/* --- Design tokens → Tailwind utilities --- */
 @theme {
   --color-background: var(--background);
   --color-surface: var(--surface);
@@ -29,6 +27,16 @@
   --font-display: "Inter Tight", system-ui, sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, monospace;
   --font-serif: "Georgia", serif;
+
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.04), 0 0 0 1px rgba(0, 0, 0, 0.04);
+  --shadow-md: 0 1px 2px rgba(0, 0, 0, 0.04), 0 8px 24px rgba(0, 0, 0, 0.05);
+  --shadow-lg: 0 4px 12px rgba(0, 0, 0, 0.05), 0 24px 56px rgba(0, 0, 0, 0.08);
+
+  --radius-sm: 6px;
+  --radius-base: 10px;
+  --radius-md: 14px;
+  --radius-lg: 18px;
+  --radius-xl: 24px;
 }
 
 /* --- Light theme (default) --- */
@@ -75,21 +83,26 @@
 
   --success: #22c55e;
   --error: #ea580c;
+
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.2), 0 0 0 1px rgba(255, 255, 255, 0.04);
+  --shadow-md: 0 1px 2px rgba(0, 0, 0, 0.3), 0 8px 24px rgba(0, 0, 0, 0.25);
+  --shadow-lg: 0 4px 12px rgba(0, 0, 0, 0.3), 0 24px 56px rgba(0, 0, 0, 0.4);
 }
 
-/* --- Base reset --- */
-*,
-*::before,
-*::after {
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
-}
+/* --- Base overrides (inside Tailwind's base layer) --- */
+@layer base {
+  html, body, #root {
+    height: 100%;
+  }
 
-body {
-  font-family: var(--font-sans);
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-  background: var(--background);
-  color: var(--foreground);
+  body {
+    font-family: var(--font-sans);
+    font-feature-settings: "cv11", "ss01", "ss03";
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+    background: var(--background);
+    color: var(--foreground);
+    line-height: 1.45;
+  }
 }

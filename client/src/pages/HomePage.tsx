@@ -1,0 +1,311 @@
+import { useAuth } from "../contexts/AuthContext";
+import { useModals } from "../contexts/ModalContext";
+import { Icon } from "../components/shell/Icon";
+import { AvatarGroup } from "../components/shell/Avatar";
+
+interface UpcomingMeeting {
+  id: string;
+  title: string;
+  date: string;
+  time: string;
+  dow: string;
+  day: string;
+  participants: string[];
+  status?: "live";
+}
+
+interface RecentMeeting {
+  id: string;
+  title: string;
+  when: string;
+  duration: string;
+  participants: string[];
+  notes: "ready" | "generating" | "failed";
+  actions?: number;
+}
+
+const UPCOMING: UpcomingMeeting[] = [
+  { id: "u1", title: "Q3 Launch Readiness", date: "Today", time: "11:00 — 11:45", dow: "Tue", day: "14", participants: ["Sara Kim", "Diego Ortiz", "Mei Tanaka", "Alex Reyes"], status: "live" },
+  { id: "u2", title: "Weekly 1:1 — Sara", date: "Today", time: "14:00 — 14:30", dow: "Tue", day: "14", participants: ["Sara Kim", "Alex Reyes"] },
+  { id: "u3", title: "Customer Discovery — Halcyon", date: "Tomorrow", time: "09:30 — 10:15", dow: "Wed", day: "15", participants: ["Priya Shah", "Diego Ortiz", "Alex Reyes"] },
+  { id: "u4", title: "Design Review · Notes editor", date: "Thu, May 16", time: "15:00 — 16:00", dow: "Thu", day: "16", participants: ["Mei Tanaka", "Diego Ortiz", "Alex Reyes"] },
+];
+
+const RECENT: RecentMeeting[] = [
+  { id: "r1", title: "Q3 Launch Planning", when: "13 May · 11:00", duration: "42m", participants: ["Sara Kim", "Diego Ortiz", "Alex Reyes"], notes: "ready", actions: 7 },
+  { id: "r2", title: "Onboarding flow critique", when: "13 May · 16:00", duration: "28m", participants: ["Mei Tanaka", "Alex Reyes"], notes: "ready", actions: 4 },
+  { id: "r3", title: "Customer Interview · Folio", when: "12 May · 10:30", duration: "51m", participants: ["Tomás Lindqvist", "Alex Reyes"], notes: "ready", actions: 9 },
+  { id: "r4", title: "Design system sync", when: "12 May · 14:00", duration: "35m", participants: ["Mei Tanaka", "Diego Ortiz"], notes: "generating" },
+  { id: "r5", title: "All-hands prep", when: "10 May · 09:00", duration: "22m", participants: ["Sara Kim", "Alex Reyes"], notes: "ready", actions: 3 },
+];
+
+const STATS = [
+  { label: "Meetings this week", value: "12", sub: "+3 vs last" },
+  { label: "Hours captured", value: "8.4", sub: "−1.1 vs last" },
+  { label: "Action items", value: "38", sub: "24 open" },
+  { label: "Notes generated", value: "11", sub: "92% success" },
+];
+
+function UpcomingCard({ m }: { m: UpcomingMeeting }) {
+  return (
+    <div className="bg-surface border border-border rounded-[14px] shadow-sm p-5 flex flex-col gap-4 transition-shadow duration-150 hover:shadow-md min-h-[200px]">
+      <div className="flex items-start gap-3">
+        <div className="w-14 py-2.5 rounded-[10px] bg-surface-hover border border-border flex flex-col items-center shrink-0">
+          <div className="text-[10.5px] tracking-[0.06em] text-tertiary uppercase font-medium">{m.dow}</div>
+          <div className="text-[22px] font-semibold text-foreground tabular-nums">{m.day}</div>
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="text-[14.5px] font-semibold text-foreground overflow-hidden text-ellipsis whitespace-nowrap">
+            {m.title}
+          </div>
+          <div className="text-[12px] text-secondary mt-1">{m.date} · {m.time}</div>
+        </div>
+        {m.status === "live" && (
+          <span className="inline-flex items-center gap-1.5 px-2.5 py-[3px] rounded-full bg-surface-hover border border-border text-[11px] font-medium text-secondary whitespace-nowrap">
+            <span className="w-1.5 h-1.5 rounded-full bg-success shadow-[0_0_0_3px_rgba(22,163,74,0.15)]" />
+            Live in 12m
+          </span>
+        )}
+      </div>
+
+      <div className="flex-1" />
+
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <AvatarGroup names={m.participants} size={22} max={3} />
+          <span className="text-[11.5px] text-tertiary">{m.participants.length} guests</span>
+        </div>
+        <button className="h-[30px] px-[11px] rounded-lg bg-accent text-accent-foreground font-medium text-[13px] inline-flex items-center gap-1.5 border border-accent hover:bg-black transition-all duration-150 active:scale-[0.98]">
+          <Icon name="video" size={12} /> Join
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function RecentRow({ m }: { m: RecentMeeting }) {
+  return (
+    <div className="bg-surface border border-border rounded-[14px] shadow-sm px-[18px] py-4 flex items-center gap-4 transition-colors duration-[120ms] hover:bg-surface-hover cursor-pointer min-h-16">
+      <div className="w-9 h-9 rounded-lg bg-surface-hover border border-border flex items-center justify-center text-secondary shrink-0">
+        <Icon name="fileText" size={15} />
+      </div>
+      <div className="min-w-0 flex-1">
+        <div className="flex items-center gap-2">
+          <span className="text-[14px] font-semibold text-foreground overflow-hidden text-ellipsis whitespace-nowrap">
+            {m.title}
+          </span>
+          {m.notes === "generating" && (
+            <span className="inline-flex items-center gap-1.5 text-[11px] text-secondary px-2 py-[3px] rounded-full bg-surface-hover border border-border">
+              <span className="w-1.5 h-1.5 rounded-full bg-gradient-to-br from-foreground to-secondary shadow-[0_0_0_3px_rgba(0,0,0,0.05)]" />
+              Generating
+            </span>
+          )}
+          {m.notes === "failed" && (
+            <span className="inline-flex items-center gap-1.5 text-[11px] font-medium text-error px-2 py-[3px] rounded-full bg-white border border-border">
+              <span className="w-1.5 h-1.5 rounded-full bg-error" />
+              Failed
+            </span>
+          )}
+        </div>
+        <div className="text-[12px] text-tertiary mt-[3px]">
+          {m.when} · {m.duration} · {m.participants.length} attendees
+          {m.actions ? ` · ${m.actions} actions` : ""}
+        </div>
+      </div>
+      <AvatarGroup names={m.participants} size={20} max={3} />
+      {m.notes === "ready" && (
+        <button className="h-[30px] px-[11px] rounded-lg border border-border-strong bg-surface text-foreground font-medium text-[13px] inline-flex items-center gap-1.5 hover:bg-surface-hover hover:border-border-focused transition-all duration-150 shrink-0">
+          Open notes <Icon name="arrowRight" size={11} />
+        </button>
+      )}
+      {m.notes === "generating" && (
+        <button className="h-[30px] px-[11px] rounded-lg text-[13px] text-tertiary opacity-50 cursor-default shrink-0" disabled>
+          ~30s
+        </button>
+      )}
+      {m.notes === "failed" && (
+        <button className="h-[30px] px-[11px] rounded-lg text-[13px] font-medium text-foreground hover:bg-hover transition-colors shrink-0">
+          Retry
+        </button>
+      )}
+    </div>
+  );
+}
+
+export function HomePage() {
+  const { user } = useAuth();
+  const { openStartMeeting, openScheduleMeeting } = useModals();
+
+  const now = new Date();
+  const dateStr = now.toLocaleDateString("en-US", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+  });
+  const hour = now.getHours();
+  const greeting = hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";
+  const firstName = user?.displayName?.split(" ")[0] ?? "there";
+
+  return (
+    <div className="px-8 py-7 max-w-[1240px] mx-auto flex flex-col gap-8">
+      {/* Greeting */}
+      <div>
+        <div className="text-[11px] font-medium uppercase tracking-[0.12em] text-tertiary">
+          {dateStr}
+        </div>
+        <h1 className="text-[28px] font-semibold tracking-[-0.025em] font-display mt-1 text-foreground">
+          {greeting}, {firstName}.
+        </h1>
+        <p className="text-[14px] text-secondary mt-1.5">
+          You have 3 meetings today. The first starts in 12 minutes.
+        </p>
+      </div>
+
+      {/* Start meeting hero */}
+      <div className="relative rounded-[14px] overflow-hidden bg-[linear-gradient(180deg,#111_0%,#1a1a19_100%)] text-white shadow-[0_20px_40px_rgba(0,0,0,0.12),0_2px_6px_rgba(0,0,0,0.05)]">
+        <div
+          className="absolute inset-0 pointer-events-none"
+          style={{
+            backgroundImage: "radial-gradient(circle at 1px 1px, rgba(255,255,255,0.04) 1px, transparent 0)",
+            backgroundSize: "14px 14px",
+          }}
+        />
+        <div className="relative p-9 flex items-center gap-8">
+          <div className="flex-1">
+            <div className="inline-flex items-center gap-[7px] px-2.5 py-[3px] rounded-full bg-white/[0.08] text-white/85 text-[11px] font-medium tracking-[0.04em]">
+              <span className="w-1.5 h-1.5 rounded-full bg-white shadow-[0_0_0_3px_rgba(255,255,255,0.15)]" />
+              Ready when you are
+            </div>
+            <h2 className="text-[32px] font-semibold tracking-[-0.03em] font-display mt-3.5 text-white leading-[1.05]">
+              Start a meeting.
+            </h2>
+            <p className="mt-2 text-[13.5px] text-white/60 max-w-[380px]">
+              We'll record, transcribe and write the notes. You stay in the conversation.
+            </p>
+            <div className="flex gap-2.5 mt-6">
+              <button
+                onClick={openStartMeeting}
+                className="h-11 px-5 rounded-[10px] bg-white text-[#111] font-medium text-[15px] inline-flex items-center gap-2 border border-white hover:shadow-[0_8px_24px_rgba(255,255,255,0.15)] transition-shadow duration-200 active:scale-[0.98]"
+              >
+                <Icon name="play" size={11} /> Start meeting
+              </button>
+              <button
+                onClick={openScheduleMeeting}
+                className="h-11 px-5 rounded-[10px] bg-transparent text-white font-medium text-[15px] inline-flex items-center gap-2 border border-white/[0.18] hover:border-white/30 transition-colors duration-150"
+              >
+                <Icon name="plus" size={13} /> Schedule
+              </button>
+            </div>
+            <div className="mt-[22px] flex gap-4 text-[11.5px] text-white/50">
+              <span className="flex items-center gap-1.5">
+                <span className="w-[5px] h-[5px] rounded-full bg-white/40" /> Auto-record
+              </span>
+              <span className="flex items-center gap-1.5">
+                <span className="w-[5px] h-[5px] rounded-full bg-white/40" /> Speaker labels
+              </span>
+              <span className="flex items-center gap-1.5">
+                <span className="w-[5px] h-[5px] rounded-full bg-white/40" /> Notes in &lt;60s
+              </span>
+            </div>
+          </div>
+
+          {/* Preview panel */}
+          <div className="w-[260px] self-stretch bg-white/[0.04] border border-white/[0.08] rounded-xl p-[18px] flex-col hidden lg:flex">
+            <div className="flex items-center justify-between mb-3">
+              <span className="text-[10px] tracking-[0.08em] uppercase px-[7px] py-[3px] rounded bg-white/[0.08] text-white/70">
+                Preview
+              </span>
+              <span className="text-[11px] text-white/50 font-mono">00:14:32</span>
+            </div>
+            <div className="flex flex-col gap-2 flex-1">
+              {[
+                { who: "Sara Kim", txt: "Let's confirm the August 14 ship date — anything blocking?" },
+                { who: "Diego Ortiz", txt: "Two P0s remain. I'll have the playbook by Monday." },
+                { who: "Mei Tanaka", txt: "Marketing copy locks Friday, per Sara.", live: true },
+              ].map((m, i) => (
+                <div
+                  key={i}
+                  className={`px-2.5 py-2 rounded-lg ${m.live ? "bg-white/[0.06] border border-white/[0.08]" : "border border-transparent"}`}
+                >
+                  <div className="text-[10.5px] text-white/55 font-medium tracking-[0.02em]">{m.who}</div>
+                  <div className="text-[11.5px] text-white/85 mt-[3px] leading-[1.45]">{m.txt}</div>
+                </div>
+              ))}
+            </div>
+            <div className="mt-3 px-2.5 py-2 rounded-lg bg-white/[0.04] flex items-center gap-2">
+              <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
+              <span className="text-[11px] text-white/70">Listening...</span>
+              <span className="flex-1" />
+              <Icon name="mic" size={12} className="text-white/50" />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Stats strip */}
+      <div className="bg-surface border border-border rounded-[14px] shadow-sm grid grid-cols-4">
+        {STATS.map((s, i) => (
+          <div
+            key={i}
+            className={`py-[18px] px-[22px] ${i < 3 ? "border-r border-border" : ""}`}
+          >
+            <div className="text-[11px] text-tertiary uppercase tracking-[0.08em] font-medium">
+              {s.label}
+            </div>
+            <div className="flex items-baseline gap-2 mt-2">
+              <div className="text-[28px] font-semibold tracking-[-0.02em] tabular-nums text-foreground">
+                {s.value}
+              </div>
+              <div className="text-[11.5px] text-tertiary">{s.sub}</div>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Upcoming */}
+      <div>
+        <div className="flex items-center justify-between mb-3.5">
+          <div>
+            <h2 className="text-[17px] font-semibold tracking-[-0.015em] font-display text-foreground">
+              Upcoming
+            </h2>
+            <div className="text-[12.5px] text-tertiary mt-[3px]">Next 7 days</div>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <button className="h-[30px] px-[11px] rounded-lg text-[13px] font-medium text-foreground hover:bg-hover transition-colors">
+              This week
+            </button>
+            <button className="h-[30px] px-[11px] rounded-lg text-[13px] font-medium text-foreground hover:bg-hover transition-colors inline-flex items-center gap-1">
+              All <Icon name="arrowRight" size={11} />
+            </button>
+          </div>
+        </div>
+        <div className="grid grid-cols-2 gap-3.5">
+          {UPCOMING.map((m) => (
+            <UpcomingCard key={m.id} m={m} />
+          ))}
+        </div>
+      </div>
+
+      {/* Recent meetings */}
+      <div>
+        <div className="flex items-center justify-between mb-3.5">
+          <div>
+            <h2 className="text-[17px] font-semibold tracking-[-0.015em] font-display text-foreground">
+              Recent meetings
+            </h2>
+            <div className="text-[12.5px] text-tertiary mt-[3px]">Notes ready to read</div>
+          </div>
+          <button className="h-[30px] px-[11px] rounded-lg text-[13px] font-medium text-foreground hover:bg-hover transition-colors inline-flex items-center gap-1">
+            View all <Icon name="arrowRight" size={11} />
+          </button>
+        </div>
+        <div className="flex flex-col gap-2">
+          {RECENT.map((m) => (
+            <RecentRow key={m.id} m={m} />
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}

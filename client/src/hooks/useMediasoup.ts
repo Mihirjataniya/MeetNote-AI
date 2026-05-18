@@ -11,6 +11,7 @@ import type {
   NewProducerPayload,
   ProducerClosedPayload,
   PeerLeftPayload,
+  ExistingProducersResponse,
 } from "../types/index";
 
 export function useMediasoup(socket: TypedSocket | null, roomId: string | null) {
@@ -27,6 +28,8 @@ export function useMediasoup(socket: TypedSocket | null, roomId: string | null) 
   const remoteStreamsRef = useRef<Map<string, MediaStream>>(new Map());
   const roomIdRef = useRef<string | null>(null);
   const socketRef = useRef<TypedSocket | null>(null);
+  const receivingInitRef = useRef(false);
+  const consumedProducerIds = useRef<Set<string>>(new Set());
 
   useEffect(() => {
     roomIdRef.current = roomId;
@@ -64,7 +67,9 @@ export function useMediasoup(socket: TypedSocket | null, roomId: string | null) 
     []
   );
 
-  const initializeDevice = useCallback(async (): Promise<Device> => {
+  const ensureDevice = useCallback(async (): Promise<Device> => {
+    if (deviceRef.current) return deviceRef.current;
+
     const currentRoomId = roomIdRef.current;
     if (!currentRoomId) throw new Error("No room ID");
 
@@ -81,6 +86,8 @@ export function useMediasoup(socket: TypedSocket | null, roomId: string | null) 
 
   const createSendTransport = useCallback(
     async (device: Device): Promise<Transport> => {
+      if (sendTransportRef.current) return sendTransportRef.current;
+
       const currentRoomId = roomIdRef.current;
       if (!currentRoomId) throw new Error("No room ID");
 
@@ -126,6 +133,8 @@ export function useMediasoup(socket: TypedSocket | null, roomId: string | null) 
 
   const createRecvTransport = useCallback(
     async (device: Device): Promise<Transport> => {
+      if (recvTransportRef.current) return recvTransportRef.current;
+
       const currentRoomId = roomIdRef.current;
       if (!currentRoomId) throw new Error("No room ID");
 
@@ -159,11 +168,15 @@ export function useMediasoup(socket: TypedSocket | null, roomId: string | null) 
 
   const consumeProducer = useCallback(
     async (producerId: string, producerSocketId: string) => {
+      if (consumedProducerIds.current.has(producerId)) return;
+
       const currentRoomId = roomIdRef.current;
       const device = deviceRef.current;
       const recvTransport = recvTransportRef.current;
 
       if (!currentRoomId || !device || !recvTransport) return;
+
+      consumedProducerIds.current.add(producerId);
 
       const response = await emitWithAck<ConsumedResponse>("consume", {
         roomId: currentRoomId,
@@ -194,8 +207,33 @@ export function useMediasoup(socket: TypedSocket | null, roomId: string | null) 
     [emitWithAck, updateRemoteStreams]
   );
 
+  // Auto-initialize device + recv transport when roomId is set,
+  // then fetch and consume all existing producers in the room
+  useEffect(() => {
+    if (!socket || !roomId || receivingInitRef.current) return;
+    receivingInitRef.current = true;
+
+    (async () => {
+      try {
+        const device = await ensureDevice();
+        await createRecvTransport(device);
+
+        const { producers } = await emitWithAck<ExistingProducersResponse>(
+          "get-producers",
+          { roomId }
+        );
+
+        for (const p of producers) {
+          await consumeProducer(p.producerId, p.producerSocketId);
+        }
+      } catch (err) {
+        console.error("Failed to initialize receiving:", err);
+      }
+    })();
+  }, [socket, roomId, ensureDevice, createRecvTransport, emitWithAck, consumeProducer]);
+
   const startProducing = useCallback(async () => {
-    const device = await initializeDevice();
+    const device = await ensureDevice();
     const sendTransport = await createSendTransport(device);
     await createRecvTransport(device);
 
@@ -209,7 +247,7 @@ export function useMediasoup(socket: TypedSocket | null, roomId: string | null) 
       const producer = await sendTransport.produce({ track });
       producersRef.current.set(producer.id, producer);
     }
-  }, [initializeDevice, createSendTransport, createRecvTransport]);
+  }, [ensureDevice, createSendTransport, createRecvTransport]);
 
   const close = useCallback(() => {
     for (const producer of producersRef.current.values()) {
@@ -227,6 +265,8 @@ export function useMediasoup(socket: TypedSocket | null, roomId: string | null) 
     recvTransportRef.current?.close();
     recvTransportRef.current = null;
     deviceRef.current = null;
+    receivingInitRef.current = false;
+    consumedProducerIds.current.clear();
 
     if (localStream) {
       localStream.getTracks().forEach((t) => t.stop());
@@ -237,6 +277,7 @@ export function useMediasoup(socket: TypedSocket | null, roomId: string | null) 
     setRemoteStreams(new Map());
   }, [localStream]);
 
+  // Listen for new producers (real-time) and peer disconnections
   useEffect(() => {
     const s = socketRef.current;
     if (!s || !roomId) return;
@@ -249,6 +290,8 @@ export function useMediasoup(socket: TypedSocket | null, roomId: string | null) 
     };
 
     const handleProducerClosed = (payload: ProducerClosedPayload) => {
+      consumedProducerIds.current.delete(payload.producerId);
+
       for (const [id, consumer] of consumersRef.current) {
         if (consumer.producerId === payload.producerId) {
           consumer.close();
@@ -273,6 +316,7 @@ export function useMediasoup(socket: TypedSocket | null, roomId: string | null) 
       for (const [id, consumer] of consumersRef.current) {
         const stream = remoteStreamsRef.current.get(payload.socketId);
         if (stream && stream.getTracks().includes(consumer.track)) {
+          consumedProducerIds.current.delete(consumer.producerId);
           consumer.close();
           consumersRef.current.delete(id);
         }

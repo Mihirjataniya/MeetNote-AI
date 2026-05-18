@@ -20,6 +20,9 @@
   --color-accent: var(--accent);
   --color-accent-foreground: var(--accent-foreground);
 
+  --color-hover: var(--hover);
+  --color-hover-strong: var(--hover-strong);
+
   --color-success: var(--success);
   --color-error: var(--error);
 
@@ -58,6 +61,9 @@
   --accent: #111111;
   --accent-foreground: #ffffff;
 
+  --hover: rgba(0, 0, 0, 0.035);
+  --hover-strong: rgba(0, 0, 0, 0.06);
+
   --success: #16a34a;
   --error: #c2410c;
 }
@@ -80,6 +86,9 @@
 
   --accent: #ededed;
   --accent-foreground: #111111;
+
+  --hover: rgba(255, 255, 255, 0.04);
+  --hover-strong: rgba(255, 255, 255, 0.07);
 
   --success: #22c55e;
   --error: #ea580c;
@@ -105,4 +114,25 @@
     color: var(--foreground);
     line-height: 1.45;
   }
+
+  ::-webkit-scrollbar { width: 8px; height: 8px; }
+  ::-webkit-scrollbar-thumb { background: rgba(0, 0, 0, 0.08); border-radius: 999px; }
+  ::-webkit-scrollbar-thumb:hover { background: rgba(0, 0, 0, 0.18); }
+  ::-webkit-scrollbar-track { background: transparent; }
+}
+
+/* --- Animations --- */
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes pop-in {
+  from { opacity: 0; transform: translateY(6px) scale(0.985); }
+  to { opacity: 1; transform: none; }
+}
+
+@keyframes toast-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: none; }
 }

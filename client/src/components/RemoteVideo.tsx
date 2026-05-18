@@ -15,9 +15,16 @@ export function RemoteVideo({ stream, displayName }: RemoteVideoProps) {
   }, [stream]);
 
   return (
-    <div className="video-container video-remote">
-      <video ref={videoRef} autoPlay playsInline />
-      <span className="video-label">{displayName}</span>
+    <div className="relative rounded-xl overflow-hidden bg-[#1a1a1a] border border-white/[0.08]">
+      <video
+        ref={videoRef}
+        autoPlay
+        playsInline
+        className="w-full h-full object-cover"
+      />
+      <span className="absolute bottom-3 left-3 px-2.5 py-1 rounded-md bg-black/60 backdrop-blur-sm text-[12px] font-medium text-white">
+        {displayName}
+      </span>
     </div>
   );
 }

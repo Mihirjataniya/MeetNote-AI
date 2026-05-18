@@ -107,6 +107,20 @@ export interface PeerLeftPayload {
   displayName: string;
 }
 
+export interface GetProducersPayload {
+  roomId: string;
+}
+
+export interface ExistingProducer {
+  producerId: string;
+  producerSocketId: string;
+  kind: MediaKind;
+}
+
+export interface ExistingProducersResponse {
+  producers: ExistingProducer[];
+}
+
 export interface NewProducerPayload {
   roomId: string;
   producerId: string;
@@ -157,6 +171,10 @@ export interface ClientToServerEvents {
   "resume-consumer": (
     payload: ResumeConsumerPayload,
     callback: (response: { resumed: true } | ErrorPayload) => void
+  ) => void;
+  "get-producers": (
+    payload: GetProducersPayload,
+    callback: (response: ExistingProducersResponse | ErrorPayload) => void
   ) => void;
 }
 

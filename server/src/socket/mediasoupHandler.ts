@@ -1,6 +1,7 @@
 import { Server, Socket } from "socket.io";
 import { mediasoupService } from "../services/mediasoupService";
 import { roomService } from "../services/roomService";
+import type { MediaKind } from "mediasoup/types";
 import type {
   ClientToServerEvents,
   ServerToClientEvents,
@@ -299,6 +300,39 @@ export function registerMediasoupHandlers(io: TypedServer): void {
         callback({ resumed: true });
       } catch {
         callback({ message: "Failed to resume consumer" });
+      }
+    });
+
+    socket.on("get-producers", (payload, callback) => {
+      try {
+        if (!payload?.roomId || typeof payload.roomId !== "string") {
+          callback({ message: "Room ID is required" });
+          return;
+        }
+
+        const room = roomService.getRoom(payload.roomId);
+        if (!room) {
+          callback({ message: "Room not found" });
+          return;
+        }
+
+        const producers: { producerId: string; producerSocketId: string; kind: MediaKind }[] = [];
+        for (const [peerId, media] of room.peerMedia) {
+          if (peerId === socket.id) continue;
+          for (const [producerId, producer] of media.producers) {
+            if (!producer.closed) {
+              producers.push({
+                producerId,
+                producerSocketId: peerId,
+                kind: producer.kind,
+              });
+            }
+          }
+        }
+
+        callback({ producers });
+      } catch {
+        callback({ message: "Failed to get producers" });
       }
     });
 

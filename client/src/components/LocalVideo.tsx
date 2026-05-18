@@ -10,9 +10,17 @@ export function LocalVideo({ stream }: { stream: MediaStream }) {
   }, [stream]);
 
   return (
-    <div className="video-container video-local">
-      <video ref={videoRef} autoPlay muted playsInline />
-      <span className="video-label">You</span>
+    <div className="relative rounded-xl overflow-hidden bg-[#1a1a1a] border border-white/[0.08]">
+      <video
+        ref={videoRef}
+        autoPlay
+        muted
+        playsInline
+        className="w-full h-full object-cover"
+      />
+      <span className="absolute bottom-3 left-3 px-2.5 py-1 rounded-md bg-black/60 backdrop-blur-sm text-[12px] font-medium text-white">
+        You
+      </span>
     </div>
   );
 }

@@ -1,44 +1,16 @@
 import "./styles/index.css";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
-import { RoomProvider, useRoom } from "./contexts/RoomContext";
 import { AuthPage } from "./components/AuthPage";
-import { JoinForm } from "./components/JoinForm";
-import { Room } from "./components/Room";
+import { AppShell } from "./components/shell/AppShell";
+import { HomePage } from "./pages/HomePage";
+import { SchedulesPage } from "./pages/SchedulesPage";
+import { HistoryPage } from "./pages/HistoryPage";
+import { SettingsPage } from "./pages/SettingsPage";
+import { ProfilePage } from "./pages/ProfilePage";
+import { MeetingPage } from "./pages/MeetingPage";
 
-function MeetingApp() {
-  const { user, logout } = useAuth();
-  const { roomId } = useRoom();
-
-  return (
-    <div className="h-full flex flex-col bg-background">
-      <header className="h-14 px-7 flex items-center gap-4 border-b border-border bg-background">
-        <span className="inline-flex items-center gap-2.5 font-semibold text-[15px] tracking-tight text-foreground">
-          <span className="w-[22px] h-[22px] rounded-[6px] bg-accent text-accent-foreground inline-flex items-center justify-center font-display text-[13px] font-bold">
-            M
-          </span>
-          MeetNote
-        </span>
-        <div className="flex-1" />
-        {user && (
-          <div className="flex items-center gap-3">
-            <span className="text-[13px] font-medium text-foreground">{user.displayName}</span>
-            <button
-              onClick={logout}
-              className="h-[30px] px-3 text-[13px] font-medium rounded-lg border border-border-strong bg-surface text-foreground hover:bg-surface-hover transition-colors"
-            >
-              Logout
-            </button>
-          </div>
-        )}
-      </header>
-      <div className="flex-1 overflow-auto">
-        {roomId ? <Room /> : <JoinForm />}
-      </div>
-    </div>
-  );
-}
-
-function AuthGate() {
+function AppRoutes() {
   const { user, loading } = useAuth();
 
   if (loading) {
@@ -62,16 +34,27 @@ function AuthGate() {
   }
 
   return (
-    <RoomProvider>
-      <MeetingApp />
-    </RoomProvider>
+    <Routes>
+      <Route path="/room/:roomId" element={<MeetingPage />} />
+      <Route element={<AppShell />}>
+        <Route index element={<Navigate to="/home" replace />} />
+        <Route path="home" element={<HomePage />} />
+        <Route path="schedules" element={<SchedulesPage />} />
+        <Route path="history" element={<HistoryPage />} />
+        <Route path="settings" element={<SettingsPage />} />
+        <Route path="profile" element={<ProfilePage />} />
+        <Route path="*" element={<Navigate to="/home" replace />} />
+      </Route>
+    </Routes>
   );
 }
 
 function App() {
   return (
     <AuthProvider>
-      <AuthGate />
+      <BrowserRouter>
+        <AppRoutes />
+      </BrowserRouter>
     </AuthProvider>
   );
 }

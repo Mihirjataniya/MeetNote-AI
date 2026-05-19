@@ -30,7 +30,7 @@ function MeetingContent() {
   if (roomId) return <Room />;
 
   return (
-    <div className="h-full flex flex-col items-center justify-center bg-[#0a0a0a] text-white">
+    <div className="h-full flex flex-col items-center justify-center bg-[#0a0a0a] text-white px-4">
       {error ? (
         <div className="text-center max-w-sm">
           <div className="w-14 h-14 rounded-2xl bg-[#dc2626]/10 border border-[#dc2626]/20 flex items-center justify-center mx-auto mb-4">
@@ -53,9 +53,9 @@ function MeetingContent() {
           <p className="text-[15px] text-white/70 font-medium">
             {connected
               ? urlRoomId === "new"
-                ? "Creating room..."
-                : "Joining room..."
-              : "Connecting to server..."}
+                ? "Creating room…"
+                : "Joining room…"
+              : "Connecting to server…"}
           </p>
         </div>
       )}

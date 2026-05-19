@@ -81,9 +81,9 @@ export function ScheduleMeetingModal({ open, onClose, onConfirm }: ScheduleMeeti
         />
       </div>
 
-      {/* Date / Time / Duration */}
-      <div className="flex gap-2.5 mb-3.5">
-        <div className="flex-1">
+      {/* Date / Time / Duration — stacks on mobile */}
+      <div className="grid grid-cols-1 xs:grid-cols-3 gap-2.5 mb-3.5">
+        <div>
           <label className="text-[12px] font-medium text-secondary block mb-2">Date</label>
           <input
             type="date"
@@ -92,7 +92,7 @@ export function ScheduleMeetingModal({ open, onClose, onConfirm }: ScheduleMeeti
             onChange={(e) => setDate(e.target.value)}
           />
         </div>
-        <div className="w-[130px]">
+        <div>
           <label className="text-[12px] font-medium text-secondary block mb-2">Time</label>
           <input
             type="time"
@@ -101,7 +101,7 @@ export function ScheduleMeetingModal({ open, onClose, onConfirm }: ScheduleMeeti
             onChange={(e) => setTime(e.target.value)}
           />
         </div>
-        <div className="w-[130px]">
+        <div>
           <label className="text-[12px] font-medium text-secondary block mb-2">Duration</label>
           <select
             className="w-full h-10 px-3 border border-border-strong bg-surface rounded-[10px] text-[14px] text-foreground outline-none transition-all duration-150 focus:border-border-focused focus:shadow-[0_0_0_4px_rgba(0,0,0,0.04)]"
@@ -140,7 +140,7 @@ export function ScheduleMeetingModal({ open, onClose, onConfirm }: ScheduleMeeti
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder={participants.length ? "Add someone..." : "Search teammates..."}
-            className="flex-1 min-w-[120px] border-none outline-none px-1.5 py-1 text-[13px] bg-transparent placeholder:text-tertiary"
+            className="flex-1 min-w-[100px] border-none outline-none px-1.5 py-1 text-[13px] bg-transparent placeholder:text-tertiary"
           />
         </div>
 
@@ -160,7 +160,7 @@ export function ScheduleMeetingModal({ open, onClose, onConfirm }: ScheduleMeeti
                   <div className="text-[13px] font-medium text-foreground">{p.name}</div>
                   <div className="text-[11px] text-tertiary">{p.email}</div>
                 </div>
-                <span className="text-[11px] font-medium text-tertiary bg-surface-hover border border-border rounded-full px-2.5 py-0.5">
+                <span className="text-[11px] font-medium text-tertiary bg-surface-hover border border-border rounded-full px-2.5 py-0.5 hidden xs:inline">
                   {p.role}
                 </span>
               </button>

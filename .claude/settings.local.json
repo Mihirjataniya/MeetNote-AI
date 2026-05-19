@@ -13,7 +13,10 @@
       "Bash(npm install *)",
       "PowerShell(try { $r = Invoke-WebRequest -Uri \"http://localhost:5174/\" -UseBasicParsing -TimeoutSec 10; \"Status: $\\($r.StatusCode\\), Length: $\\($r.Content.Length\\)\" } catch { \"Error: $_\" })",
       "PowerShell(New-Item *)",
-      "PowerShell(try { $r = Invoke-WebRequest -Uri \"http://localhost:5174/\" -UseBasicParsing -TimeoutSec 10; \"Status: $\\($r.StatusCode\\)\" } catch { \"Error: $_\" })"
+      "PowerShell(try { $r = Invoke-WebRequest -Uri \"http://localhost:5174/\" -UseBasicParsing -TimeoutSec 10; \"Status: $\\($r.StatusCode\\)\" } catch { \"Error: $_\" })",
+      "Bash(npm ls *)",
+      "WebFetch(domain:localhost)",
+      "PowerShell(npm install *)"
     ]
   }
 }

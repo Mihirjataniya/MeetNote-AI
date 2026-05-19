@@ -237,6 +237,12 @@ export function useMediasoup(socket: TypedSocket | null, roomId: string | null) 
     const sendTransport = await createSendTransport(device);
     await createRecvTransport(device);
 
+    if (!navigator.mediaDevices?.getUserMedia) {
+      throw new Error(
+        "Camera/mic access requires HTTPS. Please use a secure connection."
+      );
+    }
+
     const stream = await navigator.mediaDevices.getUserMedia({
       audio: true,
       video: true,

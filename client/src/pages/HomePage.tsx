@@ -48,22 +48,22 @@ const STATS = [
 
 function UpcomingCard({ m }: { m: UpcomingMeeting }) {
   return (
-    <div className="bg-surface border border-border rounded-[14px] shadow-sm p-5 flex flex-col gap-4 transition-shadow duration-150 hover:shadow-md min-h-[200px]">
+    <div className="bg-surface border border-border rounded-[14px] shadow-sm p-4 sm:p-5 flex flex-col gap-3 sm:gap-4 transition-shadow duration-150 hover:shadow-md min-h-[180px] sm:min-h-[200px]">
       <div className="flex items-start gap-3">
-        <div className="w-14 py-2.5 rounded-[10px] bg-surface-hover border border-border flex flex-col items-center shrink-0">
-          <div className="text-[10.5px] tracking-[0.06em] text-tertiary uppercase font-medium">{m.dow}</div>
-          <div className="text-[22px] font-semibold text-foreground tabular-nums">{m.day}</div>
+        <div className="w-12 sm:w-14 py-2 sm:py-2.5 rounded-[10px] bg-surface-hover border border-border flex flex-col items-center shrink-0">
+          <div className="text-[10px] sm:text-[10.5px] tracking-[0.06em] text-tertiary uppercase font-medium">{m.dow}</div>
+          <div className="text-[20px] sm:text-[22px] font-semibold text-foreground tabular-nums">{m.day}</div>
         </div>
         <div className="flex-1 min-w-0">
-          <div className="text-[14.5px] font-semibold text-foreground overflow-hidden text-ellipsis whitespace-nowrap">
+          <div className="text-[13.5px] sm:text-[14.5px] font-semibold text-foreground overflow-hidden text-ellipsis whitespace-nowrap">
             {m.title}
           </div>
-          <div className="text-[12px] text-secondary mt-1">{m.date} · {m.time}</div>
+          <div className="text-[11.5px] sm:text-[12px] text-secondary mt-1">{m.date} · {m.time}</div>
         </div>
         {m.status === "live" && (
-          <span className="inline-flex items-center gap-1.5 px-2.5 py-[3px] rounded-full bg-surface-hover border border-border text-[11px] font-medium text-secondary whitespace-nowrap">
+          <span className="inline-flex items-center gap-1.5 px-2 sm:px-2.5 py-[3px] rounded-full bg-surface-hover border border-border text-[10px] sm:text-[11px] font-medium text-secondary whitespace-nowrap">
             <span className="w-1.5 h-1.5 rounded-full bg-success shadow-[0_0_0_3px_rgba(22,163,74,0.15)]" />
-            Live in 12m
+            <span className="hidden xs:inline">Live in </span>12m
           </span>
         )}
       </div>
@@ -73,7 +73,7 @@ function UpcomingCard({ m }: { m: UpcomingMeeting }) {
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <AvatarGroup names={m.participants} size={22} max={3} />
-          <span className="text-[11.5px] text-tertiary">{m.participants.length} guests</span>
+          <span className="text-[11px] sm:text-[11.5px] text-tertiary">{m.participants.length} guests</span>
         </div>
         <button className="h-[30px] px-[11px] rounded-lg bg-accent text-accent-foreground font-medium text-[13px] inline-flex items-center gap-1.5 border border-accent hover:bg-black transition-all duration-150 active:scale-[0.98]">
           <Icon name="video" size={12} /> Join
@@ -85,49 +85,55 @@ function UpcomingCard({ m }: { m: UpcomingMeeting }) {
 
 function RecentRow({ m }: { m: RecentMeeting }) {
   return (
-    <div className="bg-surface border border-border rounded-[14px] shadow-sm px-[18px] py-4 flex items-center gap-4 transition-colors duration-[120ms] hover:bg-surface-hover cursor-pointer min-h-16">
-      <div className="w-9 h-9 rounded-lg bg-surface-hover border border-border flex items-center justify-center text-secondary shrink-0">
-        <Icon name="fileText" size={15} />
-      </div>
-      <div className="min-w-0 flex-1">
-        <div className="flex items-center gap-2">
-          <span className="text-[14px] font-semibold text-foreground overflow-hidden text-ellipsis whitespace-nowrap">
-            {m.title}
-          </span>
-          {m.notes === "generating" && (
-            <span className="inline-flex items-center gap-1.5 text-[11px] text-secondary px-2 py-[3px] rounded-full bg-surface-hover border border-border">
-              <span className="w-1.5 h-1.5 rounded-full bg-gradient-to-br from-foreground to-secondary shadow-[0_0_0_3px_rgba(0,0,0,0.05)]" />
-              Generating
-            </span>
-          )}
-          {m.notes === "failed" && (
-            <span className="inline-flex items-center gap-1.5 text-[11px] font-medium text-error px-2 py-[3px] rounded-full bg-white border border-border">
-              <span className="w-1.5 h-1.5 rounded-full bg-error" />
-              Failed
-            </span>
-          )}
+    <div className="bg-surface border border-border rounded-[14px] shadow-sm px-4 sm:px-[18px] py-3.5 sm:py-4 flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4 transition-colors duration-[120ms] hover:bg-surface-hover cursor-pointer">
+      <div className="flex items-center gap-3 sm:gap-4 flex-1 min-w-0">
+        <div className="w-9 h-9 rounded-lg bg-surface-hover border border-border flex items-center justify-center text-secondary shrink-0">
+          <Icon name="fileText" size={15} />
         </div>
-        <div className="text-[12px] text-tertiary mt-[3px]">
-          {m.when} · {m.duration} · {m.participants.length} attendees
-          {m.actions ? ` · ${m.actions} actions` : ""}
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2">
+            <span className="text-[13.5px] sm:text-[14px] font-semibold text-foreground overflow-hidden text-ellipsis whitespace-nowrap">
+              {m.title}
+            </span>
+            {m.notes === "generating" && (
+              <span className="inline-flex items-center gap-1.5 text-[11px] text-secondary px-2 py-[3px] rounded-full bg-surface-hover border border-border">
+                <span className="w-1.5 h-1.5 rounded-full bg-gradient-to-br from-foreground to-secondary shadow-[0_0_0_3px_rgba(0,0,0,0.05)]" />
+                Generating
+              </span>
+            )}
+            {m.notes === "failed" && (
+              <span className="inline-flex items-center gap-1.5 text-[11px] font-medium text-error px-2 py-[3px] rounded-full bg-white border border-border">
+                <span className="w-1.5 h-1.5 rounded-full bg-error" />
+                Failed
+              </span>
+            )}
+          </div>
+          <div className="text-[11.5px] sm:text-[12px] text-tertiary mt-[3px]">
+            {m.when} · {m.duration} · {m.participants.length} attendees
+            {m.actions ? ` · ${m.actions} actions` : ""}
+          </div>
         </div>
       </div>
-      <AvatarGroup names={m.participants} size={20} max={3} />
-      {m.notes === "ready" && (
-        <button className="h-[30px] px-[11px] rounded-lg border border-border-strong bg-surface text-foreground font-medium text-[13px] inline-flex items-center gap-1.5 hover:bg-surface-hover hover:border-border-focused transition-all duration-150 shrink-0">
-          Open notes <Icon name="arrowRight" size={11} />
-        </button>
-      )}
-      {m.notes === "generating" && (
-        <button className="h-[30px] px-[11px] rounded-lg text-[13px] text-tertiary opacity-50 cursor-default shrink-0" disabled>
-          ~30s
-        </button>
-      )}
-      {m.notes === "failed" && (
-        <button className="h-[30px] px-[11px] rounded-lg text-[13px] font-medium text-foreground hover:bg-hover transition-colors shrink-0">
-          Retry
-        </button>
-      )}
+      <div className="flex items-center justify-between sm:justify-end gap-3 pl-12 sm:pl-0">
+        <AvatarGroup names={m.participants} size={20} max={3} />
+        {m.notes === "ready" && (
+          <button className="h-[30px] px-[11px] rounded-lg border border-border-strong bg-surface text-foreground font-medium text-[13px] inline-flex items-center gap-1.5 hover:bg-surface-hover hover:border-border-focused transition-all duration-150 shrink-0">
+            <span className="hidden sm:inline">Open notes</span>
+            <span className="sm:hidden">Notes</span>
+            <Icon name="arrowRight" size={11} />
+          </button>
+        )}
+        {m.notes === "generating" && (
+          <button className="h-[30px] px-[11px] rounded-lg text-[13px] text-tertiary opacity-50 cursor-default shrink-0" disabled>
+            ~30s
+          </button>
+        )}
+        {m.notes === "failed" && (
+          <button className="h-[30px] px-[11px] rounded-lg text-[13px] font-medium text-foreground hover:bg-hover transition-colors shrink-0">
+            Retry
+          </button>
+        )}
+      </div>
     </div>
   );
 }
@@ -147,16 +153,16 @@ export function HomePage() {
   const firstName = user?.displayName?.split(" ")[0] ?? "there";
 
   return (
-    <div className="px-8 py-7 max-w-[1240px] mx-auto flex flex-col gap-8">
+    <div className="px-4 sm:px-6 md:px-8 py-5 sm:py-7 max-w-[1240px] mx-auto flex flex-col gap-6 sm:gap-8">
       {/* Greeting */}
       <div>
         <div className="text-[11px] font-medium uppercase tracking-[0.12em] text-tertiary">
           {dateStr}
         </div>
-        <h1 className="text-[28px] font-semibold tracking-[-0.025em] font-display mt-1 text-foreground">
+        <h1 className="text-[22px] sm:text-[28px] font-semibold tracking-[-0.025em] font-display mt-1 text-foreground">
           {greeting}, {firstName}.
         </h1>
-        <p className="text-[14px] text-secondary mt-1.5">
+        <p className="text-[13px] sm:text-[14px] text-secondary mt-1.5">
           You have 3 meetings today. The first starts in 12 minutes.
         </p>
       </div>
@@ -170,33 +176,33 @@ export function HomePage() {
             backgroundSize: "14px 14px",
           }}
         />
-        <div className="relative p-9 flex items-center gap-8">
+        <div className="relative p-5 sm:p-7 md:p-9 flex flex-col lg:flex-row items-start lg:items-center gap-6 lg:gap-8">
           <div className="flex-1">
             <div className="inline-flex items-center gap-[7px] px-2.5 py-[3px] rounded-full bg-white/[0.08] text-white/85 text-[11px] font-medium tracking-[0.04em]">
               <span className="w-1.5 h-1.5 rounded-full bg-white shadow-[0_0_0_3px_rgba(255,255,255,0.15)]" />
               Ready when you are
             </div>
-            <h2 className="text-[32px] font-semibold tracking-[-0.03em] font-display mt-3.5 text-white leading-[1.05]">
+            <h2 className="text-[24px] sm:text-[28px] md:text-[32px] font-semibold tracking-[-0.03em] font-display mt-3 sm:mt-3.5 text-white leading-[1.05]">
               Start a meeting.
             </h2>
-            <p className="mt-2 text-[13.5px] text-white/60 max-w-[380px]">
+            <p className="mt-2 text-[13px] sm:text-[13.5px] text-white/60 max-w-[380px]">
               We'll record, transcribe and write the notes. You stay in the conversation.
             </p>
-            <div className="flex gap-2.5 mt-6">
+            <div className="flex flex-col xs:flex-row gap-2.5 mt-5 sm:mt-6">
               <button
                 onClick={openStartMeeting}
-                className="h-11 px-5 rounded-[10px] bg-white text-[#111] font-medium text-[15px] inline-flex items-center gap-2 border border-white hover:shadow-[0_8px_24px_rgba(255,255,255,0.15)] transition-shadow duration-200 active:scale-[0.98]"
+                className="h-10 sm:h-11 px-4 sm:px-5 rounded-[10px] bg-white text-[#111] font-medium text-[14px] sm:text-[15px] inline-flex items-center justify-center gap-2 border border-white hover:shadow-[0_8px_24px_rgba(255,255,255,0.15)] transition-shadow duration-200 active:scale-[0.98]"
               >
                 <Icon name="play" size={11} /> Start meeting
               </button>
               <button
                 onClick={openScheduleMeeting}
-                className="h-11 px-5 rounded-[10px] bg-transparent text-white font-medium text-[15px] inline-flex items-center gap-2 border border-white/[0.18] hover:border-white/30 transition-colors duration-150"
+                className="h-10 sm:h-11 px-4 sm:px-5 rounded-[10px] bg-transparent text-white font-medium text-[14px] sm:text-[15px] inline-flex items-center justify-center gap-2 border border-white/[0.18] hover:border-white/30 transition-colors duration-150"
               >
                 <Icon name="plus" size={13} /> Schedule
               </button>
             </div>
-            <div className="mt-[22px] flex gap-4 text-[11.5px] text-white/50">
+            <div className="mt-4 sm:mt-[22px] flex flex-wrap gap-3 sm:gap-4 text-[11px] sm:text-[11.5px] text-white/50">
               <span className="flex items-center gap-1.5">
                 <span className="w-[5px] h-[5px] rounded-full bg-white/40" /> Auto-record
               </span>
@@ -209,7 +215,7 @@ export function HomePage() {
             </div>
           </div>
 
-          {/* Preview panel */}
+          {/* Preview panel — hidden below lg */}
           <div className="w-[260px] self-stretch bg-white/[0.04] border border-white/[0.08] rounded-xl p-[18px] flex-col hidden lg:flex">
             <div className="flex items-center justify-between mb-3">
               <span className="text-[10px] tracking-[0.08em] uppercase px-[7px] py-[3px] rounded bg-white/[0.08] text-white/70">
@@ -243,20 +249,24 @@ export function HomePage() {
       </div>
 
       {/* Stats strip */}
-      <div className="bg-surface border border-border rounded-[14px] shadow-sm grid grid-cols-4">
+      <div className="bg-surface border border-border rounded-[14px] shadow-sm grid grid-cols-2 md:grid-cols-4">
         {STATS.map((s, i) => (
           <div
             key={i}
-            className={`py-[18px] px-[22px] ${i < 3 ? "border-r border-border" : ""}`}
+            className={`py-3.5 sm:py-[18px] px-4 sm:px-[22px] ${
+              i < 3 ? "md:border-r md:border-border" : ""
+            } ${i % 2 === 0 ? "border-r border-border md:border-r" : ""} ${
+              i < 2 ? "border-b border-border md:border-b-0" : ""
+            }`}
           >
-            <div className="text-[11px] text-tertiary uppercase tracking-[0.08em] font-medium">
+            <div className="text-[10px] sm:text-[11px] text-tertiary uppercase tracking-[0.08em] font-medium">
               {s.label}
             </div>
-            <div className="flex items-baseline gap-2 mt-2">
-              <div className="text-[28px] font-semibold tracking-[-0.02em] tabular-nums text-foreground">
+            <div className="flex items-baseline gap-1.5 sm:gap-2 mt-1.5 sm:mt-2">
+              <div className="text-[22px] sm:text-[28px] font-semibold tracking-[-0.02em] tabular-nums text-foreground">
                 {s.value}
               </div>
-              <div className="text-[11.5px] text-tertiary">{s.sub}</div>
+              <div className="text-[10.5px] sm:text-[11.5px] text-tertiary">{s.sub}</div>
             </div>
           </div>
         ))}
@@ -264,15 +274,15 @@ export function HomePage() {
 
       {/* Upcoming */}
       <div>
-        <div className="flex items-center justify-between mb-3.5">
+        <div className="flex items-center justify-between mb-3 sm:mb-3.5">
           <div>
-            <h2 className="text-[17px] font-semibold tracking-[-0.015em] font-display text-foreground">
+            <h2 className="text-[16px] sm:text-[17px] font-semibold tracking-[-0.015em] font-display text-foreground">
               Upcoming
             </h2>
-            <div className="text-[12.5px] text-tertiary mt-[3px]">Next 7 days</div>
+            <div className="text-[12px] sm:text-[12.5px] text-tertiary mt-[3px]">Next 7 days</div>
           </div>
           <div className="flex items-center gap-1.5">
-            <button className="h-[30px] px-[11px] rounded-lg text-[13px] font-medium text-foreground hover:bg-hover transition-colors">
+            <button className="h-[30px] px-[11px] rounded-lg text-[13px] font-medium text-foreground hover:bg-hover transition-colors hidden sm:inline-flex">
               This week
             </button>
             <button className="h-[30px] px-[11px] rounded-lg text-[13px] font-medium text-foreground hover:bg-hover transition-colors inline-flex items-center gap-1">
@@ -280,7 +290,7 @@ export function HomePage() {
             </button>
           </div>
         </div>
-        <div className="grid grid-cols-2 gap-3.5">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-3.5">
           {UPCOMING.map((m) => (
             <UpcomingCard key={m.id} m={m} />
           ))}
@@ -289,12 +299,12 @@ export function HomePage() {
 
       {/* Recent meetings */}
       <div>
-        <div className="flex items-center justify-between mb-3.5">
+        <div className="flex items-center justify-between mb-3 sm:mb-3.5">
           <div>
-            <h2 className="text-[17px] font-semibold tracking-[-0.015em] font-display text-foreground">
+            <h2 className="text-[16px] sm:text-[17px] font-semibold tracking-[-0.015em] font-display text-foreground">
               Recent meetings
             </h2>
-            <div className="text-[12.5px] text-tertiary mt-[3px]">Notes ready to read</div>
+            <div className="text-[12px] sm:text-[12.5px] text-tertiary mt-[3px]">Notes ready to read</div>
           </div>
           <button className="h-[30px] px-[11px] rounded-lg text-[13px] font-medium text-foreground hover:bg-hover transition-colors inline-flex items-center gap-1">
             View all <Icon name="arrowRight" size={11} />

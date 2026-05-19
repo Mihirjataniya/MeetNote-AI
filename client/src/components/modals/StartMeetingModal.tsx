@@ -47,7 +47,7 @@ export function StartMeetingModal({ open, onClose }: StartMeetingModalProps) {
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center"
+      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4"
       style={{
         background: "rgba(20, 20, 19, 0.32)",
         backdropFilter: "blur(6px)",
@@ -55,44 +55,46 @@ export function StartMeetingModal({ open, onClose }: StartMeetingModalProps) {
       }}
       onClick={handleClose}
     >
-      <div className="flex flex-col items-center" onClick={(e) => e.stopPropagation()}>
+      <div className="flex flex-col items-stretch sm:items-center w-full sm:w-auto" onClick={(e) => e.stopPropagation()}>
         {/* Tabs — outside modal, attached to top */}
-        <div className="flex self-start ml-6">
+        <div className="flex self-start ml-4 sm:ml-6">
           <button
             onClick={() => setTab("start")}
-            className={`px-5 py-2.5 text-[13px] font-medium rounded-t-[10px] transition-colors duration-150 ${
+            className={`px-4 sm:px-5 py-2.5 text-[13px] font-medium rounded-t-[10px] transition-colors duration-150 ${
               tab === "start"
                 ? "bg-surface text-foreground"
                 : "bg-surface-muted/80 text-tertiary hover:text-secondary"
             }`}
           >
             <span className="flex items-center gap-2">
-              <Icon name="play" size={11} /> Start meeting
+              <Icon name="play" size={11} /> Start
+              <span className="hidden sm:inline">meeting</span>
             </span>
           </button>
           <button
             onClick={() => setTab("join")}
-            className={`px-5 py-2.5 text-[13px] font-medium rounded-t-[10px] transition-colors duration-150 ${
+            className={`px-4 sm:px-5 py-2.5 text-[13px] font-medium rounded-t-[10px] transition-colors duration-150 ${
               tab === "join"
                 ? "bg-surface text-foreground"
                 : "bg-surface-muted/80 text-tertiary hover:text-secondary"
             }`}
           >
             <span className="flex items-center gap-2">
-              <Icon name="video" size={12} /> Join meeting
+              <Icon name="video" size={12} /> Join
+              <span className="hidden sm:inline">meeting</span>
             </span>
           </button>
         </div>
 
         {/* Modal card */}
         <div
-          className="bg-surface rounded-[14px] rounded-tl-none shadow-lg border border-border overflow-hidden w-[520px]"
+          className="bg-surface sm:rounded-[14px] rounded-t-[14px] rounded-tl-none shadow-lg border border-border overflow-hidden w-full sm:w-[520px] max-h-[80vh] sm:max-h-[85vh] flex flex-col"
           style={{ animation: "pop-in 0.22s cubic-bezier(0.2, 0.7, 0.3, 1)" }}
         >
           {/* Header */}
-          <div className="px-6 pt-5 pb-3.5 flex items-start gap-3.5">
+          <div className="px-5 sm:px-6 pt-5 pb-3.5 flex items-start gap-3.5 shrink-0">
             <div className="flex-1">
-              <h3 className="text-[17px] font-semibold tracking-tight font-display text-foreground leading-[1.3]">
+              <h3 className="text-[16px] sm:text-[17px] font-semibold tracking-tight font-display text-foreground leading-[1.3]">
                 {tab === "start" ? "Start a meeting" : "Join a meeting"}
               </h3>
               <p className="text-[13px] text-secondary mt-1">
@@ -110,7 +112,7 @@ export function StartMeetingModal({ open, onClose }: StartMeetingModalProps) {
           </div>
 
           {/* Content */}
-          <div className="px-6 pb-5">
+          <div className="px-5 sm:px-6 pb-5 overflow-y-auto flex-1">
             {tab === "start" ? (
               <>
                 <div className="mb-3.5">
@@ -182,7 +184,7 @@ export function StartMeetingModal({ open, onClose }: StartMeetingModalProps) {
           </div>
 
           {/* Footer */}
-          <div className="px-6 py-3.5 border-t border-border bg-surface-hover flex justify-end gap-2">
+          <div className="px-5 sm:px-6 py-3.5 border-t border-border bg-surface-hover flex justify-end gap-2 shrink-0">
             <button
               className="h-[38px] px-4 rounded-[10px] text-[14px] font-medium text-foreground hover:bg-hover transition-colors"
               onClick={handleClose}

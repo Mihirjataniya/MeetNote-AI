@@ -2,13 +2,13 @@ import { Icon } from "../components/shell/Icon";
 
 export function HistoryPage() {
   return (
-    <div className="px-8 py-7 max-w-[1240px] mx-auto">
-      <div className="flex items-center justify-between">
+    <div className="px-4 sm:px-6 md:px-8 py-5 sm:py-7 max-w-[1240px] mx-auto">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
-          <h1 className="text-[28px] font-semibold tracking-[-0.025em] font-display text-foreground">
+          <h1 className="text-[22px] sm:text-[28px] font-semibold tracking-[-0.025em] font-display text-foreground">
             Meeting Histories
           </h1>
-          <p className="text-[14px] text-secondary mt-1.5">
+          <p className="text-[13px] sm:text-[14px] text-secondary mt-1.5">
             Browse, search and export notes from past meetings.
           </p>
         </div>
@@ -22,8 +22,7 @@ export function HistoryPage() {
         </div>
       </div>
 
-      {/* Search bar */}
-      <div className="relative mt-6">
+      <div className="relative mt-5 sm:mt-6">
         <Icon
           name="search"
           size={15}
@@ -35,7 +34,7 @@ export function HistoryPage() {
         />
       </div>
 
-      <div className="mt-6 bg-surface border border-border rounded-[14px] shadow-sm p-10 flex flex-col items-center justify-center text-center min-h-[360px]">
+      <div className="mt-5 sm:mt-6 bg-surface border border-border rounded-[14px] shadow-sm p-6 sm:p-10 flex flex-col items-center justify-center text-center min-h-[280px] sm:min-h-[360px]">
         <div className="w-12 h-12 rounded-xl bg-surface-hover border border-border flex items-center justify-center text-tertiary mb-4">
           <Icon name="history" size={22} />
         </div>

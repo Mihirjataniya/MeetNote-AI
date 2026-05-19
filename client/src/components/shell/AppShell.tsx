@@ -4,6 +4,7 @@ import { Sidebar } from "./Sidebar";
 import { Topbar } from "./Topbar";
 import { Icon } from "./Icon";
 import { ModalContext } from "../../contexts/ModalContext";
+import { SidebarContext } from "../../contexts/SidebarContext";
 import { StartMeetingModal } from "../modals/StartMeetingModal";
 import { ScheduleMeetingModal } from "../modals/ScheduleMeetingModal";
 
@@ -11,6 +12,8 @@ export function AppShell() {
   const [startOpen, setStartOpen] = useState(false);
   const [scheduleOpen, setScheduleOpen] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
+  const [collapsed, setCollapsed] = useState(false);
+  const [mobileOpen, setMobileOpen] = useState(false);
 
   useEffect(() => {
     if (!toast) return;
@@ -19,18 +22,30 @@ export function AppShell() {
   }, [toast]);
 
   return (
-    <ModalContext.Provider
+    <SidebarContext.Provider
       value={{
-        openStartMeeting: () => setStartOpen(true),
-        openScheduleMeeting: () => setScheduleOpen(true),
+        collapsed,
+        mobileOpen,
+        toggleCollapsed: () => setCollapsed((c) => !c),
+        setMobileOpen,
       }}
     >
-      <div className="h-full grid grid-cols-[260px_1fr] bg-background">
-        <Sidebar />
-        <div className="flex flex-col min-h-0 overflow-hidden">
-          <Topbar />
-          <div className="flex-1 overflow-y-auto overflow-x-hidden">
-            <Outlet />
+      <ModalContext.Provider
+        value={{
+          openStartMeeting: () => setStartOpen(true),
+          openScheduleMeeting: () => setScheduleOpen(true),
+        }}
+      >
+        <div
+          className="h-full grid bg-background transition-[grid-template-columns] duration-200 grid-cols-[1fr] md:grid-cols-[var(--sidebar-w)_1fr]"
+          style={{ "--sidebar-w": collapsed ? "60px" : "260px" } as React.CSSProperties}
+        >
+          <Sidebar />
+          <div className="flex flex-col min-h-0 overflow-hidden">
+            <Topbar />
+            <div className="flex-1 overflow-y-auto overflow-x-hidden">
+              <Outlet />
+            </div>
           </div>
         </div>
 
@@ -54,7 +69,7 @@ export function AppShell() {
             </div>
           </div>
         )}
-      </div>
-    </ModalContext.Provider>
+      </ModalContext.Provider>
+    </SidebarContext.Provider>
   );
 }

@@ -42,6 +42,7 @@ import {
   PanelLeftOpen,
   Phone,
   MonitorUp,
+  MonitorX,
   MessageSquare,
   type LucideIcon,
 } from "lucide-react";
@@ -89,6 +90,7 @@ const iconMap: Record<string, LucideIcon> = {
   videoOff: VideoOff,
   phone: Phone,
   screenShare: MonitorUp,
+  screenShareOff: MonitorX,
   chat: MessageSquare,
 };
 

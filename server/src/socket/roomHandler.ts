@@ -60,8 +60,9 @@ export function registerRoomHandlers(io: TypedServer): void {
           callback({ message: "Room ID is required" });
           return;
         }
-
+        console.log("Attempting to join room: ", payload.roomId);
         const room = roomService.getRoom(payload.roomId);
+        console.log("ROOM : ", room);
         if (!room) {
           callback({ message: "Room not found" });
           return;

@@ -44,11 +44,8 @@ export function useSocket(token: string | null) {
   }, [getSocket, token]);
 
   const disconnect = useCallback(() => {
-    if (socketRef.current) {
-      socketRef.current.disconnect();
-      socketRef.current = null;
-      setConnected(false);
-    }
+    socketRef.current?.disconnect();
+    setConnected(false);
   }, []);
 
   useEffect(() => {

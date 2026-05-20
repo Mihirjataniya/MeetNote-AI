@@ -16,7 +16,9 @@
       "PowerShell(try { $r = Invoke-WebRequest -Uri \"http://localhost:5174/\" -UseBasicParsing -TimeoutSec 10; \"Status: $\\($r.StatusCode\\)\" } catch { \"Error: $_\" })",
       "Bash(npm ls *)",
       "WebFetch(domain:localhost)",
-      "PowerShell(npm install *)"
+      "PowerShell(npm install *)",
+      "PowerShell(\\(Get-NetIPAddress -AddressFamily IPv4 | Where-Object { $_.InterfaceAlias -notmatch 'Loopback' -and $_.IPAddress -notmatch '^169' }\\).IPAddress)",
+      "Bash(npx tsc *)"
     ]
   }
 }

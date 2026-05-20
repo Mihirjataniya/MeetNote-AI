@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useRoom } from "../contexts/RoomContext";
 import { useAuth } from "../contexts/AuthContext";
@@ -30,15 +30,40 @@ export function Room() {
     participants,
     localStream,
     remoteStreams,
+    remoteScreenStreams,
+    screenStream,
     error,
     leaveRoom,
     startMedia,
+    startScreenShare,
+    stopScreenShare,
     socketId,
   } = useRoom();
+
   const navigate = useNavigate();
 
   const [micOn, setMicOn] = useState(true);
   const [camOn, setCamOn] = useState(true);
+
+  const handleToggleCam = useCallback(() => {
+    if (!localStream) {
+      startMedia();
+      return;
+    }
+    const next = !camOn;
+    localStream.getVideoTracks().forEach((t) => {
+      t.enabled = next;
+    });
+    setCamOn(next);
+  }, [localStream, camOn, startMedia]);
+
+  const handleToggleScreen = useCallback(() => {
+    if (screenStream) {
+      stopScreenShare();
+    } else {
+      startScreenShare();
+    }
+  }, [screenStream, startScreenShare, stopScreenShare]);
   const [showParticipants, setShowParticipants] = useState(false);
   const [copied, setCopied] = useState(false);
   const [elapsed, setElapsed] = useState(0);
@@ -46,6 +71,11 @@ export function Room() {
   useEffect(() => {
     const interval = setInterval(() => setElapsed((e) => e + 1), 1000);
     return () => clearInterval(interval);
+  }, []);
+
+  useEffect(() => {
+    startMedia();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const toggleMic = useCallback(() => {
@@ -58,15 +88,6 @@ export function Room() {
     }
   }, [localStream, micOn]);
 
-  const toggleCam = useCallback(() => {
-    if (localStream) {
-      const next = !camOn;
-      localStream.getVideoTracks().forEach((t) => {
-        t.enabled = next;
-      });
-      setCamOn(next);
-    }
-  }, [localStream, camOn]);
 
   const copyRoomId = () => {
     if (roomId) {
@@ -84,6 +105,13 @@ export function Room() {
   const peerLookup = new Map(
     participants.map((p) => [p.socketId, p.displayName])
   );
+
+  const supportsScreenShare = !!navigator.mediaDevices?.getDisplayMedia;
+  const remoteScreenEntries = Array.from(remoteScreenStreams.entries());
+  const spotlightStream = screenStream ?? remoteScreenEntries[0]?.[1] ?? null;
+  const spotlightLabel = screenStream
+    ? "Your screen"
+    : peerLookup.get(remoteScreenEntries[0]?.[0]) ?? "Screen share";
 
   const streamCount = (localStream ? 1 : 0) + remoteStreams.size;
 
@@ -147,13 +175,43 @@ export function Room() {
         </div>
       )}
 
-      {/* ── Video grid area ── */}
+      {/* ── Video area ── */}
       <div
         className={`flex-1 p-3 sm:p-4 min-h-0 ${
-          streamCount > 0 ? "" : "flex items-center justify-center"
+          spotlightStream || streamCount > 0 ? "" : "flex items-center justify-center"
         }`}
       >
-        {streamCount > 0 ? (
+        {spotlightStream ? (
+          /* ── Spotlight layout ── */
+          <div className="flex flex-col h-full gap-2 sm:gap-3">
+            {/* Main spotlight */}
+            <div className="flex-1 min-h-0">
+              <ScreenTile stream={spotlightStream} label={spotlightLabel} />
+            </div>
+            {/* Camera strip */}
+            <div className="h-28 sm:h-36 flex gap-2 overflow-x-auto shrink-0 pb-1">
+              {localStream && (
+                <div className="w-40 sm:w-48 shrink-0 h-full">
+                  <LocalVideo
+                    stream={localStream}
+                    micOn={micOn}
+                    camOn={camOn}
+                    displayName={user?.displayName ?? "You"}
+                  />
+                </div>
+              )}
+              {Array.from(remoteStreams.entries()).map(([peerId, stream]) => (
+                <div key={peerId} className="w-40 sm:w-48 shrink-0 h-full">
+                  <RemoteVideo
+                    stream={stream}
+                    displayName={peerLookup.get(peerId) ?? peerId.slice(0, 8)}
+                  />
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : streamCount > 0 ? (
+          /* ── Grid layout ── */
           <div
             className={`grid ${getGridClass(streamCount)} gap-2.5 sm:gap-3 w-full mx-auto h-full auto-rows-fr`}
           >
@@ -174,13 +232,12 @@ export function Room() {
             ))}
           </div>
         ) : (
+          /* ── Empty state ── */
           <div className="flex flex-col items-center justify-center text-center px-4">
             <div className="w-20 h-20 rounded-2xl bg-white/[0.04] border border-white/[0.08] flex items-center justify-center mb-5">
               <Icon name="video" size={32} className="text-white/20" />
             </div>
-            <p className="text-[16px] text-white/60 font-medium">
-              Ready to go
-            </p>
+            <p className="text-[16px] text-white/60 font-medium">Ready to go</p>
             <p className="text-[13px] text-white/30 mt-1.5 max-w-[280px]">
               Turn on your camera and microphone to start the meeting
             </p>
@@ -208,11 +265,19 @@ export function Room() {
 
           {/* Camera */}
           <ControlButton
-            icon={camOn ? "video" : "videoOff"}
-            active={!camOn}
-            disabled={!localStream}
-            onClick={toggleCam}
-            title={camOn ? "Turn off camera" : "Turn on camera"}
+            icon={localStream ? (camOn ? "video" : "videoOff") : "video"}
+            active={localStream ? !camOn : false}
+            onClick={handleToggleCam}
+            title={localStream ? (camOn ? "Turn off camera" : "Turn on camera") : "Start camera"}
+          />
+
+          {/* Screen share */}
+          <ControlButton
+            icon={screenStream ? "screenShareOff" : "screenShare"}
+            active={!!screenStream}
+            disabled={!supportsScreenShare}
+            onClick={handleToggleScreen}
+            title={supportsScreenShare ? (screenStream ? "Stop sharing" : "Share screen") : "Screen sharing not supported on this device"}
           />
 
           <div className="w-px h-7 bg-white/[0.1] mx-0.5 sm:mx-1 hidden xs:block" />
@@ -310,6 +375,31 @@ export function Room() {
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+/* ── Screen share spotlight tile ── */
+
+function ScreenTile({ stream, label }: { stream: MediaStream; label: string }) {
+  const videoRef = useRef<HTMLVideoElement>(null);
+
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video) return;
+    video.srcObject = stream;
+    video.play().catch(() => {});
+  }, [stream]);
+
+  return (
+    <div className="relative w-full h-full rounded-xl overflow-hidden bg-[#111] border border-white/[0.06]">
+      <video ref={videoRef} autoPlay playsInline className="w-full h-full object-contain" />
+      <div className="absolute bottom-2.5 left-2.5 pointer-events-none">
+        <span className="px-2.5 py-1 rounded-md bg-black/60 backdrop-blur-sm text-[12px] font-medium text-white flex items-center gap-1.5">
+          <Icon name="screenShare" size={11} />
+          {label}
+        </span>
+      </div>
     </div>
   );
 }

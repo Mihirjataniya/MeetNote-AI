@@ -13,9 +13,10 @@ export function LocalVideo({ stream, micOn, camOn, displayName }: LocalVideoProp
   const videoRef = useRef<HTMLVideoElement>(null);
 
   useEffect(() => {
-    if (videoRef.current) {
-      videoRef.current.srcObject = stream;
-    }
+    const video = videoRef.current;
+    if (!video) return;
+    video.srcObject = stream;
+    video.play().catch(() => {});
   }, [stream]);
 
   return (
@@ -26,7 +27,7 @@ export function LocalVideo({ stream, micOn, camOn, displayName }: LocalVideoProp
         autoPlay
         muted
         playsInline
-        className={`w-full h-full object-cover ${camOn ? "" : "invisible"}`}
+        className={`w-full h-full object-cover scale-x-[-1] ${camOn ? "" : "invisible"}`}
       />
 
       {/* Camera-off avatar overlay */}

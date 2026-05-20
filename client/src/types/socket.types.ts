@@ -115,6 +115,7 @@ export interface ExistingProducer {
   producerId: string;
   producerSocketId: string;
   kind: MediaKind;
+  appData?: Record<string, unknown>;
 }
 
 export interface ExistingProducersResponse {
@@ -126,6 +127,7 @@ export interface NewProducerPayload {
   producerId: string;
   producerSocketId: string;
   kind: MediaKind;
+  appData?: Record<string, unknown>;
 }
 
 export interface ProducerClosedPayload {
@@ -175,6 +177,10 @@ export interface ClientToServerEvents {
   "get-producers": (
     payload: GetProducersPayload,
     callback: (response: ExistingProducersResponse | ErrorPayload) => void
+  ) => void;
+  "close-producer": (
+    payload: { roomId: string; producerId: string },
+    callback: (response: { closed: true } | ErrorPayload) => void
   ) => void;
 }
 

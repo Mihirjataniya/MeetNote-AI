@@ -25,6 +25,8 @@ interface RoomState {
   connected: boolean;
   localStream: MediaStream | null;
   remoteStreams: Map<string, MediaStream>;
+  remoteScreenStreams: Map<string, MediaStream>;
+  screenStream: MediaStream | null;
   error: string | null;
   socketId: string | null;
 }
@@ -34,6 +36,8 @@ interface RoomActions {
   joinRoom: (roomId: string) => void;
   leaveRoom: () => void;
   startMedia: () => void;
+  startScreenShare: () => void;
+  stopScreenShare: () => void;
 }
 
 export type RoomContextValue = RoomState & RoomActions;
@@ -67,10 +71,16 @@ export function RoomProvider({ children }: { children: ReactNode }) {
     return () => disconnect();
   }, [connect, disconnect]);
 
-  const { localStream, remoteStreams, startProducing, close } = useMediasoup(
-    socket,
-    roomId
-  );
+  const {
+    localStream,
+    remoteStreams,
+    remoteScreenStreams,
+    screenStream,
+    startProducing,
+    startScreenShare: startScreenShareFn,
+    stopScreenShare,
+    close,
+  } = useMediasoup(socket, roomId);
 
   useEffect(() => {
     if (!socket) return;
@@ -142,6 +152,11 @@ export function RoomProvider({ children }: { children: ReactNode }) {
     startProducing().catch((err: Error) => setError(err.message));
   }, [startProducing]);
 
+  const startScreenShare = useCallback(() => {
+    setError(null);
+    startScreenShareFn().catch((err: Error) => setError(err.message));
+  }, [startScreenShareFn]);
+
   return (
     <RoomContext.Provider
       value={{
@@ -150,12 +165,16 @@ export function RoomProvider({ children }: { children: ReactNode }) {
         connected,
         localStream,
         remoteStreams,
+        remoteScreenStreams,
+        screenStream,
         error,
         socketId,
         createRoom,
         joinRoom,
         leaveRoom,
         startMedia,
+        startScreenShare,
+        stopScreenShare,
       }}
     >
       {children}

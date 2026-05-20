@@ -196,6 +196,7 @@ export function registerMediasoupHandlers(io: TypedServer): void {
           producerId: producer.id,
           producerSocketId: socket.id,
           kind: producer.kind,
+          appData: producer.appData as Record<string, unknown>,
         });
 
         callback({ producerId: producer.id });
@@ -316,7 +317,7 @@ export function registerMediasoupHandlers(io: TypedServer): void {
           return;
         }
 
-        const producers: { producerId: string; producerSocketId: string; kind: MediaKind }[] = [];
+        const producers: { producerId: string; producerSocketId: string; kind: MediaKind; appData?: Record<string, unknown> }[] = [];
         for (const [peerId, media] of room.peerMedia) {
           if (peerId === socket.id) continue;
           for (const [producerId, producer] of media.producers) {
@@ -325,6 +326,7 @@ export function registerMediasoupHandlers(io: TypedServer): void {
                 producerId,
                 producerSocketId: peerId,
                 kind: producer.kind,
+                appData: producer.appData as Record<string, unknown>,
               });
             }
           }
@@ -333,6 +335,30 @@ export function registerMediasoupHandlers(io: TypedServer): void {
         callback({ producers });
       } catch {
         callback({ message: "Failed to get producers" });
+      }
+    });
+
+    socket.on("close-producer", (payload, callback) => {
+      try {
+        if (!payload?.roomId || !payload.producerId) {
+          callback({ message: "roomId and producerId are required" });
+          return;
+        }
+        const room = roomService.getRoom(payload.roomId);
+        const media = room?.peerMedia.get(socket.id);
+        const producer = media?.producers.get(payload.producerId);
+        if (producer && !producer.closed) {
+          producer.close();
+          media!.producers.delete(payload.producerId);
+          socket.to(payload.roomId).emit("producer-closed", {
+            roomId: payload.roomId,
+            producerId: payload.producerId,
+            producerSocketId: socket.id,
+          });
+        }
+        callback({ closed: true });
+      } catch {
+        callback({ message: "Failed to close producer" });
       }
     });
 

@@ -9,9 +9,10 @@ export function RemoteVideo({ stream, displayName }: RemoteVideoProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
 
   useEffect(() => {
-    if (videoRef.current) {
-      videoRef.current.srcObject = stream;
-    }
+    const video = videoRef.current;
+    if (!video) return;
+    video.srcObject = stream;
+    video.play().catch(() => {});
   }, [stream]);
 
   return (
@@ -20,7 +21,7 @@ export function RemoteVideo({ stream, displayName }: RemoteVideoProps) {
         ref={videoRef}
         autoPlay
         playsInline
-        className="w-full h-full object-cover"
+        className="w-full h-full object-cover scale-x-[-1]"
       />
       <div className="absolute bottom-2.5 left-2.5 pointer-events-none">
         <span className="px-2.5 py-1 rounded-md bg-black/60 backdrop-blur-sm text-[12px] font-medium text-white">

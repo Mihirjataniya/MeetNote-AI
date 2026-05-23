@@ -1,5 +1,5 @@
 import * as mediasoup from "mediasoup";
-import type { Worker, Router, WebRtcTransport } from "mediasoup/types";
+import type { Worker, Router, WebRtcTransport, PlainTransport } from "mediasoup/types";
 import { config } from "../config/index";
 import type { TransportCreatedResponse } from "../types/index";
 
@@ -56,6 +56,14 @@ class MediasoupService {
     };
 
     return { transport, params };
+  }
+
+  async createPlainTransport(router: Router): Promise<PlainTransport> {
+    return router.createPlainTransport({
+      listenInfo: { protocol: "udp", ip: "127.0.0.1" },
+      rtcpMux: true,
+      comedia: false,
+    });
   }
 
   async closeWorker(): Promise<void> {

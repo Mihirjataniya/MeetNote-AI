@@ -1,6 +1,7 @@
 import { Server, Socket } from "socket.io";
 import { mediasoupService } from "../services/mediasoupService";
 import { roomService } from "../services/roomService";
+import { recordingService } from "../services/recordingService";
 import type { MediaKind } from "mediasoup/types";
 import type {
   ClientToServerEvents,
@@ -101,7 +102,8 @@ export function registerMediasoupHandlers(io: TypedServer): void {
         });
 
         callback(params);
-      } catch {
+      } catch (err) {
+        console.error("[mediasoup] Failed to create transport:", err);
         callback({ message: "Failed to create transport" });
       }
     });
@@ -190,6 +192,13 @@ export function registerMediasoupHandlers(io: TypedServer): void {
         producer.on("transportclose", () => {
           media.producers.delete(producer.id);
         });
+
+        const isScreenShare = (producer.appData as Record<string, unknown>)?.source === "screen";
+        if (producer.kind === "audio" && !isScreenShare && room.router) {
+          recordingService
+            .addAudioProducer(payload.roomId, socket.id, producer, room.router)
+            .catch((err) => console.error("[Recording] Failed to add audio producer:", err));
+        }
 
         socket.to(payload.roomId).emit("new-producer", {
           roomId: payload.roomId,
@@ -348,6 +357,11 @@ export function registerMediasoupHandlers(io: TypedServer): void {
         const media = room?.peerMedia.get(socket.id);
         const producer = media?.producers.get(payload.producerId);
         if (producer && !producer.closed) {
+          if (producer.kind === "audio") {
+            recordingService
+              .removeAudioProducer(payload.roomId, socket.id, payload.producerId)
+              .catch((err) => console.error("[Recording] Failed to remove audio producer:", err));
+          }
           producer.close();
           media!.producers.delete(payload.producerId);
           socket.to(payload.roomId).emit("producer-closed", {
@@ -366,6 +380,10 @@ export function registerMediasoupHandlers(io: TypedServer): void {
       for (const roomId of socket.data.rooms) {
         const room = roomService.getRoom(roomId);
         if (!room) continue;
+
+        recordingService
+          .removeAllForSocket(roomId, socket.id)
+          .catch((err) => console.error("[Recording] Failed to remove socket recordings:", err));
 
         const media = room.peerMedia.get(socket.id);
         if (!media) continue;

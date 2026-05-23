@@ -74,6 +74,22 @@ class MeetingService {
     }
   }
 
+  async getUserMeetings(
+    userId: string,
+    limit = 20
+  ): Promise<IMeeting[]> {
+    return Meeting.find({
+      "participants.userId": userId,
+    })
+      .sort({ createdAt: -1 })
+      .limit(limit)
+      .lean<IMeeting[]>();
+  }
+
+  async getMeetingById(meetingId: string): Promise<IMeeting | null> {
+    return Meeting.findById(meetingId).lean<IMeeting>();
+  }
+
   async endMeeting(meetingId: string): Promise<void> {
     try {
       const meeting = await Meeting.findById(meetingId) as IMeeting | null;

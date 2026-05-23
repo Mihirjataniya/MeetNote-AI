@@ -1,6 +1,6 @@
 import { Schema, model } from "mongoose";
 import type { Document, Types } from "mongoose";
-import type { RecordingStatus } from "../types/index";
+import type { RecordingStatus, CloudinaryFile } from "../types/index";
 import { RECORDING_STATUSES } from "../types/index";
 
 export interface IRecording extends Document {
@@ -9,7 +9,7 @@ export interface IRecording extends Document {
   recordedBy: Types.ObjectId;
   status: RecordingStatus;
   durationMs?: number;
-  storagePath?: string;
+  cloudinaryUrls?: CloudinaryFile[];
   startedAt: Date;
   stoppedAt?: Date;
   createdAt: Date;
@@ -35,7 +35,13 @@ const recordingSchema = new Schema<IRecording>(
       required: true,
     },
     durationMs: { type: Number },
-    storagePath: { type: String },
+    cloudinaryUrls: [
+      {
+        fileName: { type: String, required: true },
+        url: { type: String, required: true },
+        publicId: { type: String, required: true },
+      },
+    ],
     startedAt: { type: Date, required: true },
     stoppedAt: { type: Date },
   },

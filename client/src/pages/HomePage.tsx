@@ -1,7 +1,9 @@
+import { useState, useEffect } from "react";
 import { useAuth } from "../contexts/AuthContext";
 import { useModals } from "../contexts/ModalContext";
 import { Icon } from "../components/shell/Icon";
 import { AvatarGroup } from "../components/shell/Avatar";
+import { fetchMeetings, type MeetingSummary } from "../services/meetings";
 
 interface UpcomingMeeting {
   id: string;
@@ -14,29 +16,11 @@ interface UpcomingMeeting {
   status?: "live";
 }
 
-interface RecentMeeting {
-  id: string;
-  title: string;
-  when: string;
-  duration: string;
-  participants: string[];
-  notes: "ready" | "generating" | "failed";
-  actions?: number;
-}
-
 const UPCOMING: UpcomingMeeting[] = [
   { id: "u1", title: "Q3 Launch Readiness", date: "Today", time: "11:00 — 11:45", dow: "Tue", day: "14", participants: ["Sara Kim", "Diego Ortiz", "Mei Tanaka", "Alex Reyes"], status: "live" },
   { id: "u2", title: "Weekly 1:1 — Sara", date: "Today", time: "14:00 — 14:30", dow: "Tue", day: "14", participants: ["Sara Kim", "Alex Reyes"] },
   { id: "u3", title: "Customer Discovery — Halcyon", date: "Tomorrow", time: "09:30 — 10:15", dow: "Wed", day: "15", participants: ["Priya Shah", "Diego Ortiz", "Alex Reyes"] },
   { id: "u4", title: "Design Review · Notes editor", date: "Thu, May 16", time: "15:00 — 16:00", dow: "Thu", day: "16", participants: ["Mei Tanaka", "Diego Ortiz", "Alex Reyes"] },
-];
-
-const RECENT: RecentMeeting[] = [
-  { id: "r1", title: "Q3 Launch Planning", when: "13 May · 11:00", duration: "42m", participants: ["Sara Kim", "Diego Ortiz", "Alex Reyes"], notes: "ready", actions: 7 },
-  { id: "r2", title: "Onboarding flow critique", when: "13 May · 16:00", duration: "28m", participants: ["Mei Tanaka", "Alex Reyes"], notes: "ready", actions: 4 },
-  { id: "r3", title: "Customer Interview · Folio", when: "12 May · 10:30", duration: "51m", participants: ["Tomás Lindqvist", "Alex Reyes"], notes: "ready", actions: 9 },
-  { id: "r4", title: "Design system sync", when: "12 May · 14:00", duration: "35m", participants: ["Mei Tanaka", "Diego Ortiz"], notes: "generating" },
-  { id: "r5", title: "All-hands prep", when: "10 May · 09:00", duration: "22m", participants: ["Sara Kim", "Alex Reyes"], notes: "ready", actions: 3 },
 ];
 
 const STATS = [
@@ -83,7 +67,24 @@ function UpcomingCard({ m }: { m: UpcomingMeeting }) {
   );
 }
 
-function RecentRow({ m }: { m: RecentMeeting }) {
+function formatDuration(ms?: number): string {
+  if (!ms) return "";
+  const totalMin = Math.round(ms / 60000);
+  if (totalMin < 60) return `${totalMin}m`;
+  const h = Math.floor(totalMin / 60);
+  const m = totalMin % 60;
+  return m > 0 ? `${h}h ${m}m` : `${h}h`;
+}
+
+function formatWhen(dateStr?: string): string {
+  if (!dateStr) return "";
+  const d = new Date(dateStr);
+  return d.toLocaleDateString("en-US", { day: "numeric", month: "short" }) +
+    " · " +
+    d.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: false });
+}
+
+function RecentRow({ m }: { m: MeetingSummary }) {
   return (
     <div className="bg-surface border border-border rounded-[14px] shadow-sm px-4 sm:px-[18px] py-3.5 sm:py-4 flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4 transition-colors duration-[120ms] hover:bg-surface-hover cursor-pointer">
       <div className="flex items-center gap-3 sm:gap-4 flex-1 min-w-0">
@@ -93,46 +94,15 @@ function RecentRow({ m }: { m: RecentMeeting }) {
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
             <span className="text-[13.5px] sm:text-[14px] font-semibold text-foreground overflow-hidden text-ellipsis whitespace-nowrap">
-              {m.title}
+              {m.title || "Untitled Meeting"}
             </span>
-            {m.notes === "generating" && (
-              <span className="inline-flex items-center gap-1.5 text-[11px] text-secondary px-2 py-[3px] rounded-full bg-surface-hover border border-border">
-                <span className="w-1.5 h-1.5 rounded-full bg-gradient-to-br from-foreground to-secondary shadow-[0_0_0_3px_rgba(0,0,0,0.05)]" />
-                Generating
-              </span>
-            )}
-            {m.notes === "failed" && (
-              <span className="inline-flex items-center gap-1.5 text-[11px] font-medium text-error px-2 py-[3px] rounded-full bg-white border border-border">
-                <span className="w-1.5 h-1.5 rounded-full bg-error" />
-                Failed
-              </span>
-            )}
           </div>
           <div className="text-[11.5px] sm:text-[12px] text-tertiary mt-[3px]">
-            {m.when} · {m.duration} · {m.participants.length} attendees
-            {m.actions ? ` · ${m.actions} actions` : ""}
+            {formatWhen(m.startedAt)}
+            {m.durationMs ? ` · ${formatDuration(m.durationMs)}` : ""}
+            {` · ${m.participantCount} attendees`}
           </div>
         </div>
-      </div>
-      <div className="flex items-center justify-between sm:justify-end gap-3 pl-12 sm:pl-0">
-        <AvatarGroup names={m.participants} size={20} max={3} />
-        {m.notes === "ready" && (
-          <button className="h-[30px] px-[11px] rounded-lg border border-border-strong bg-surface text-foreground font-medium text-[13px] inline-flex items-center gap-1.5 hover:bg-surface-hover hover:border-border-focused transition-all duration-150 shrink-0">
-            <span className="hidden sm:inline">Open notes</span>
-            <span className="sm:hidden">Notes</span>
-            <Icon name="arrowRight" size={11} />
-          </button>
-        )}
-        {m.notes === "generating" && (
-          <button className="h-[30px] px-[11px] rounded-lg text-[13px] text-tertiary opacity-50 cursor-default shrink-0" disabled>
-            ~30s
-          </button>
-        )}
-        {m.notes === "failed" && (
-          <button className="h-[30px] px-[11px] rounded-lg text-[13px] font-medium text-foreground hover:bg-hover transition-colors shrink-0">
-            Retry
-          </button>
-        )}
       </div>
     </div>
   );
@@ -141,6 +111,15 @@ function RecentRow({ m }: { m: RecentMeeting }) {
 export function HomePage() {
   const { user } = useAuth();
   const { openStartMeeting, openScheduleMeeting } = useModals();
+  const [recentMeetings, setRecentMeetings] = useState<MeetingSummary[]>([]);
+  const [loadingMeetings, setLoadingMeetings] = useState(true);
+
+  useEffect(() => {
+    fetchMeetings(10)
+      .then(setRecentMeetings)
+      .catch((err) => console.error("Failed to load meetings:", err))
+      .finally(() => setLoadingMeetings(false));
+  }, []);
 
   const now = new Date();
   const dateStr = now.toLocaleDateString("en-US", {
@@ -311,7 +290,15 @@ export function HomePage() {
           </button>
         </div>
         <div className="flex flex-col gap-2">
-          {RECENT.map((m) => (
+          {loadingMeetings && (
+            <div className="text-[13px] text-tertiary py-4 text-center">Loading meetings...</div>
+          )}
+          {!loadingMeetings && recentMeetings.length === 0 && (
+            <div className="bg-surface border border-border rounded-[14px] shadow-sm px-5 py-8 text-center">
+              <div className="text-[14px] text-secondary">No meetings yet. Start your first meeting above!</div>
+            </div>
+          )}
+          {recentMeetings.map((m) => (
             <RecentRow key={m.id} m={m} />
           ))}
         </div>

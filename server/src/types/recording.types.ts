@@ -1,10 +1,17 @@
 export const RECORDING_STATUSES = [
   "recording",
+  "processing",
   "ready",
   "failed",
 ] as const;
 
 export type RecordingStatus = (typeof RECORDING_STATUSES)[number];
+
+export interface CloudinaryFile {
+  fileName: string;
+  url: string;
+  publicId: string;
+}
 
 export interface RecordingInfo {
   id: string;
@@ -12,7 +19,7 @@ export interface RecordingInfo {
   recordedBy: string;
   status: RecordingStatus;
   durationMs?: number;
-  storagePath?: string;
+  cloudinaryUrls?: CloudinaryFile[];
   startedAt: string;
   stoppedAt?: string;
   createdAt: string;

@@ -1,6 +1,9 @@
 import { Server, Socket } from "socket.io";
 import { roomService } from "../services/roomService";
 import { meetingService } from "../services/meetingService";
+import { recordingService } from "../services/recordingService";
+import { pipelineService } from "../services/pipelineService";
+import { Recording } from "../models/Recording";
 import type {
   ClientToServerEvents,
   ServerToClientEvents,
@@ -43,7 +46,17 @@ export function registerRoomHandlers(io: TypedServer): void {
           socket.data.displayName,
           { title: payload?.title, agenda: payload?.agenda }
         );
-        if (meetingId) room.meetingId = meetingId;
+        if (meetingId) {
+          room.meetingId = meetingId;
+          await Recording.create({
+            meetingId,
+            recordedBy: socket.data.userId,
+            status: "recording",
+            startedAt: new Date(),
+          });
+        }
+
+        await recordingService.startRecording(room.roomId);
 
         callback({
           roomId: room.roomId,
@@ -129,8 +142,12 @@ export function registerRoomHandlers(io: TypedServer): void {
         socket.data.rooms.delete(payload.roomId);
 
         if (meetingId) {
-          if (!roomService.getRoom(payload.roomId)) {
+          const updatedRoom = roomService.getRoom(payload.roomId);
+          if (!updatedRoom || updatedRoom.participants.size === 0) {
             meetingService.endMeeting(meetingId);
+            pipelineService
+              .run(payload.roomId, meetingId)
+              .catch((err) => console.error("[Pipeline] Failed:", err));
           } else {
             meetingService.removeParticipant(meetingId, socket.data.userId);
           }
@@ -178,8 +195,12 @@ export function registerRoomHandlers(io: TypedServer): void {
         const removed = roomService.removeParticipant(roomId, socket.id);
         if (removed) {
           if (meetingId) {
-            if (!roomService.getRoom(roomId)) {
+            const updatedRoom = roomService.getRoom(roomId);
+            if (!updatedRoom || updatedRoom.participants.size === 0) {
               meetingService.endMeeting(meetingId);
+              pipelineService
+                .run(roomId, meetingId)
+                .catch((err) => console.error("[Pipeline] Failed:", err));
             } else {
               meetingService.removeParticipant(meetingId, socket.data.userId);
             }

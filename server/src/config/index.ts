@@ -1,3 +1,5 @@
+import { fileURLToPath } from "node:url";
+import path from "node:path";
 import dotenv from "dotenv";
 import type {
   RtpCodecCapability,
@@ -20,6 +22,17 @@ export const config = {
   jwt: {
     secret: process.env.JWT_SECRET || "dev-secret-change-in-production",
     expiresIn: process.env.JWT_EXPIRES_IN || "7d" as const,
+  },
+  recordings: {
+    dir: path.join(path.dirname(fileURLToPath(import.meta.url)), "../../recordings"),
+  },
+  deepgram: {
+    apiKey: process.env.DEEPGRAM_API_KEY || "",
+  },
+  cloudinary: {
+    cloudName: process.env.CLOUDINARY_CLOUD_NAME || "",
+    apiKey: process.env.CLOUDINARY_API_KEY || "",
+    apiSecret: process.env.CLOUDINARY_API_SECRET || "",
   },
   mediasoup: {
     worker: {

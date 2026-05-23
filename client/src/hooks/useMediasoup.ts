@@ -42,13 +42,15 @@ export function useMediasoup(socket: TypedSocket | null, roomId: string | null) 
   const consumedProducerIds = useRef<Set<string>>(new Set());
   const pendingProducersRef = useRef<PendingProducer[]>([]);
 
-  useEffect(() => {
-    roomIdRef.current = roomId;
-  }, [roomId]);
+  // Promise locks — prevent concurrent callers from creating duplicate resources
+  const deviceInitPromise = useRef<Promise<Device> | null>(null);
+  const sendTransportInitPromise = useRef<Promise<Transport> | null>(null);
+  const recvTransportInitPromise = useRef<Promise<Transport> | null>(null);
 
-  useEffect(() => {
-    socketRef.current = socket;
-  }, [socket]);
+  // Keep refs in sync during render so callbacks always read the latest value
+  // without needing to be listed as effect dependencies.
+  roomIdRef.current = roomId;
+  socketRef.current = socket;
 
   const updateRemoteStreams = useCallback(() => {
     setRemoteStreams(new Map(remoteStreamsRef.current));
@@ -84,64 +86,79 @@ export function useMediasoup(socket: TypedSocket | null, roomId: string | null) 
 
   const ensureDevice = useCallback(async (): Promise<Device> => {
     if (deviceRef.current) return deviceRef.current;
+    if (deviceInitPromise.current) return deviceInitPromise.current;
 
     const currentRoomId = roomIdRef.current;
     if (!currentRoomId) throw new Error("No room ID");
 
-    const { rtpCapabilities } = await emitWithAck<RtpCapabilitiesResponse>(
-      "get-rtp-capabilities",
-      { roomId: currentRoomId }
-    );
+    deviceInitPromise.current = (async () => {
+      const { rtpCapabilities } = await emitWithAck<RtpCapabilitiesResponse>(
+        "get-rtp-capabilities",
+        { roomId: currentRoomId }
+      );
+      const device = new Device();
+      await device.load({ routerRtpCapabilities: rtpCapabilities });
+      deviceRef.current = device;
+      return device;
+    })().catch((err) => {
+      deviceInitPromise.current = null;
+      throw err;
+    });
 
-    const device = new Device();
-    await device.load({ routerRtpCapabilities: rtpCapabilities });
-    deviceRef.current = device;
-    return device;
+    return deviceInitPromise.current;
   }, [emitWithAck]);
 
   const createSendTransport = useCallback(
     async (device: Device): Promise<Transport> => {
       if (sendTransportRef.current) return sendTransportRef.current;
+      if (sendTransportInitPromise.current) return sendTransportInitPromise.current;
 
       const currentRoomId = roomIdRef.current;
       if (!currentRoomId) throw new Error("No room ID");
 
-      const params = await emitWithAck<TransportCreatedResponse>(
-        "create-transport",
-        { roomId: currentRoomId, direction: "send" }
-      );
+      sendTransportInitPromise.current = (async () => {
+        const params = await emitWithAck<TransportCreatedResponse>(
+          "create-transport",
+          { roomId: currentRoomId, direction: "send" }
+        );
 
-      const transport = device.createSendTransport({
-        id: params.id,
-        iceParameters: params.iceParameters,
-        iceCandidates: params.iceCandidates,
-        dtlsParameters: params.dtlsParameters,
+        const transport = device.createSendTransport({
+          id: params.id,
+          iceParameters: params.iceParameters,
+          iceCandidates: params.iceCandidates,
+          dtlsParameters: params.dtlsParameters,
+        });
+
+        transport.on("connect", ({ dtlsParameters }, callback, errback) => {
+          emitWithAck<{ connected: true }>("connect-transport", {
+            roomId: roomIdRef.current!,
+            transportId: transport.id,
+            dtlsParameters,
+          })
+            .then(() => callback())
+            .catch(errback);
+        });
+
+        transport.on("produce", ({ kind, rtpParameters, appData }, callback, errback) => {
+          emitWithAck<ProducedResponse>("produce", {
+            roomId: roomIdRef.current!,
+            transportId: transport.id,
+            kind,
+            rtpParameters,
+            appData,
+          })
+            .then(({ producerId }) => callback({ id: producerId }))
+            .catch(errback);
+        });
+
+        sendTransportRef.current = transport;
+        return transport;
+      })().catch((err) => {
+        sendTransportInitPromise.current = null;
+        throw err;
       });
 
-      transport.on("connect", ({ dtlsParameters }, callback, errback) => {
-        emitWithAck<{ connected: true }>("connect-transport", {
-          roomId: roomIdRef.current!,
-          transportId: transport.id,
-          dtlsParameters,
-        })
-          .then(() => callback())
-          .catch(errback);
-      });
-
-      transport.on("produce", ({ kind, rtpParameters, appData }, callback, errback) => {
-        emitWithAck<ProducedResponse>("produce", {
-          roomId: roomIdRef.current!,
-          transportId: transport.id,
-          kind,
-          rtpParameters,
-          appData,
-        })
-          .then(({ producerId }) => callback({ id: producerId }))
-          .catch(errback);
-      });
-
-      sendTransportRef.current = transport;
-      return transport;
+      return sendTransportInitPromise.current;
     },
     [emitWithAck]
   );
@@ -149,34 +166,42 @@ export function useMediasoup(socket: TypedSocket | null, roomId: string | null) 
   const createRecvTransport = useCallback(
     async (device: Device): Promise<Transport> => {
       if (recvTransportRef.current) return recvTransportRef.current;
+      if (recvTransportInitPromise.current) return recvTransportInitPromise.current;
 
       const currentRoomId = roomIdRef.current;
       if (!currentRoomId) throw new Error("No room ID");
 
-      const params = await emitWithAck<TransportCreatedResponse>(
-        "create-transport",
-        { roomId: currentRoomId, direction: "recv" }
-      );
+      recvTransportInitPromise.current = (async () => {
+        const params = await emitWithAck<TransportCreatedResponse>(
+          "create-transport",
+          { roomId: currentRoomId, direction: "recv" }
+        );
 
-      const transport = device.createRecvTransport({
-        id: params.id,
-        iceParameters: params.iceParameters,
-        iceCandidates: params.iceCandidates,
-        dtlsParameters: params.dtlsParameters,
+        const transport = device.createRecvTransport({
+          id: params.id,
+          iceParameters: params.iceParameters,
+          iceCandidates: params.iceCandidates,
+          dtlsParameters: params.dtlsParameters,
+        });
+
+        transport.on("connect", ({ dtlsParameters }, callback, errback) => {
+          emitWithAck<{ connected: true }>("connect-transport", {
+            roomId: roomIdRef.current!,
+            transportId: transport.id,
+            dtlsParameters,
+          })
+            .then(() => callback())
+            .catch(errback);
+        });
+
+        recvTransportRef.current = transport;
+        return transport;
+      })().catch((err) => {
+        recvTransportInitPromise.current = null;
+        throw err;
       });
 
-      transport.on("connect", ({ dtlsParameters }, callback, errback) => {
-        emitWithAck<{ connected: true }>("connect-transport", {
-          roomId: roomIdRef.current!,
-          transportId: transport.id,
-          dtlsParameters,
-        })
-          .then(() => callback())
-          .catch(errback);
-      });
-
-      recvTransportRef.current = transport;
-      return transport;
+      return recvTransportInitPromise.current;
     },
     [emitWithAck]
   );
@@ -369,6 +394,9 @@ export function useMediasoup(socket: TypedSocket | null, roomId: string | null) 
     recvTransportRef.current?.close();
     recvTransportRef.current = null;
     deviceRef.current = null;
+    deviceInitPromise.current = null;
+    sendTransportInitPromise.current = null;
+    recvTransportInitPromise.current = null;
     receivingInitRef.current = false;
     consumedProducerIds.current.clear();
     pendingProducersRef.current = [];

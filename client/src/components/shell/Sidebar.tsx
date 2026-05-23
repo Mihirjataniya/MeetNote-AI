@@ -47,7 +47,7 @@ function SidebarContent() {
         <div className="flex flex-col items-center gap-2 mt-[18px]">
           <button
             onClick={() => { openStartMeeting(); closeMobile(); }}
-            className="w-9 h-9 rounded-[10px] bg-accent text-accent-foreground inline-flex items-center justify-center border border-accent hover:bg-black transition-all duration-150 active:scale-[0.98]"
+            className="w-9 h-9 rounded-[10px] bg-accent text-accent-foreground inline-flex items-center justify-center border border-accent hover:brightness-90 transition-all duration-150 active:scale-[0.98]"
             title="Start meeting"
           >
             <Icon name="play" size={12} />
@@ -64,7 +64,7 @@ function SidebarContent() {
         <>
           <button
             onClick={() => { openStartMeeting(); closeMobile(); }}
-            className="mt-[18px] h-9 px-4 rounded-[10px] bg-accent text-accent-foreground font-medium text-[14px] inline-flex items-center justify-center gap-2 border border-accent hover:bg-black transition-all duration-150 active:scale-[0.98]"
+            className="mt-[18px] h-9 px-4 rounded-[10px] bg-accent text-accent-foreground font-medium text-[14px] inline-flex items-center justify-center gap-2 border border-accent hover:brightness-90 transition-all duration-150 active:scale-[0.98]"
           >
             <Icon name="play" size={12} /> Start meeting
           </button>

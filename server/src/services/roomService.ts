@@ -73,7 +73,7 @@ class RoomService {
 
     if (room.participants.size === 0) {
       room.router?.close();
-      this.rooms.delete(roomId);
+      room.router = null;
     }
 
     return participant;

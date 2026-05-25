@@ -1,5 +1,7 @@
 import { Router } from "express";
 import multer from "multer";
+import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import { requireAuth } from "../middleware/auth";
 import { recordingService } from "../services/recordingService";
@@ -9,11 +11,7 @@ const upload = multer({
     destination(_req, _file, cb) {
       const roomId = _req.body.roomId;
       const dir = recordingService.getUploadDir(roomId);
-      if (!dir) {
-        cb(new Error("No active recording for this room"), "");
-        return;
-      }
-      cb(null, dir);
+      cb(null, dir ?? os.tmpdir());
     },
     filename(_req, file, cb) {
       const unique = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
@@ -35,7 +33,8 @@ router.post("/upload", requireAuth, upload.single("audio"), (req, res) => {
   }
 
   if (!recordingService.isRecording(roomId)) {
-    res.status(404).json({ message: "No active recording for this room" });
+    try { fs.unlinkSync(req.file.path); } catch {}
+    res.status(409).json({ message: "Recording already ended" });
     return;
   }
 

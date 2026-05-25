@@ -3,13 +3,10 @@ import {
   useCallback,
   useContext,
   useEffect,
-  useMemo,
   useState,
 } from "react";
 import type { ReactNode } from "react";
-import { useAuth } from "./AuthContext";
-import { useSocket } from "../hooks/useSocket";
-import type { TypedSocket } from "../hooks/useSocket";
+import { useSocketContext } from "./SocketContext";
 import { useMediasoup } from "../hooks/useMediasoup";
 import { useRecorder } from "../hooks/useRecorder";
 import { uploadRecording } from "../services/recordings";
@@ -58,24 +55,13 @@ export function useRoom(): RoomContextValue {
 }
 
 export function RoomProvider({ children }: { children: ReactNode }) {
-  const { token } = useAuth();
-  const { getSocket, connected, connect, disconnect } = useSocket(token);
+  const { socket, connected } = useSocketContext();
   const [roomId, setRoomId] = useState<string | null>(null);
   const [meetingId, setMeetingId] = useState<string | null>(null);
   const [participants, setParticipants] = useState<ParticipantInfo[]>([]);
   const [error, setError] = useState<string | null>(null);
 
-  const socket: TypedSocket | null = useMemo(
-    () => (connected ? getSocket() : null),
-    [connected, getSocket]
-  );
-
-  const socketId = useMemo(() => socket?.id ?? null, [socket]);
-
-  useEffect(() => {
-    connect();
-    return () => disconnect();
-  }, [connect, disconnect]);
+  const socketId = socket?.id ?? null;
 
   const {
     localStream,

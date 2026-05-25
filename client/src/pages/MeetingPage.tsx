@@ -2,7 +2,6 @@ import { useEffect, useRef } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import { RoomProvider, useRoom } from "../contexts/RoomContext";
 import { Room } from "../components/Room";
-import { TranscriptModal } from "../components/TranscriptModal";
 import { Icon } from "../components/shell/Icon";
 
 function MeetingContent() {
@@ -28,18 +27,41 @@ function MeetingContent() {
     }
   }, [urlRoomId, roomId, navigate]);
 
+  useEffect(() => {
+    if (!roomId && meetingId) {
+      const timer = setTimeout(() => {
+        clearMeetingId();
+        navigate("/home");
+      }, 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [roomId, meetingId, clearMeetingId, navigate]);
+
   if (roomId) return <Room />;
 
   if (meetingId) {
     return (
-      <div className="h-full flex items-center justify-center bg-[#0a0a0a]">
-        <TranscriptModal
-          meetingId={meetingId}
-          onClose={() => {
-            clearMeetingId();
-            navigate("/home");
-          }}
-        />
+      <div className="h-full flex flex-col items-center justify-center bg-[#0a0a0a] text-white">
+        <div className="text-center max-w-sm">
+          <div className="w-14 h-14 rounded-2xl bg-white/[0.06] border border-white/[0.08] flex items-center justify-center mx-auto mb-4">
+            <Icon name="check" size={24} className="text-[#4ade80]" />
+          </div>
+          <p className="text-[16px] font-medium text-white/90 mb-2">
+            You left the meeting
+          </p>
+          <p className="text-[13px] text-white/40 leading-relaxed">
+            The transcript will appear on your dashboard once processing completes.
+          </p>
+          <button
+            onClick={() => {
+              clearMeetingId();
+              navigate("/home");
+            }}
+            className="mt-5 inline-flex items-center gap-2 h-9 px-4 rounded-lg bg-white/[0.08] text-white/70 text-[13px] font-medium hover:bg-white/[0.12] transition-colors"
+          >
+            <Icon name="home" size={13} /> Go to Dashboard
+          </button>
+        </div>
       </div>
     );
   }

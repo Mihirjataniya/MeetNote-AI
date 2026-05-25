@@ -137,6 +137,11 @@ export interface ProducerClosedPayload {
   producerSocketId: string;
 }
 
+export interface TranscriptReadyPayload {
+  meetingId: string;
+  status: "completed" | "failed";
+}
+
 export interface ClientToServerEvents {
   "create-room": (
     payload: CreateRoomPayload,
@@ -198,6 +203,7 @@ export interface ServerToClientEvents {
   "peer-left": (payload: PeerLeftPayload) => void;
   "new-producer": (payload: NewProducerPayload) => void;
   "producer-closed": (payload: ProducerClosedPayload) => void;
+  "transcript-ready": (payload: TranscriptReadyPayload) => void;
 }
 
 export function isError(response: unknown): response is ErrorPayload {

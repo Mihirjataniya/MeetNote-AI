@@ -28,6 +28,7 @@ export function registerRoomHandlers(io: TypedServer): void {
   io.on("connection", (socket: TypedSocket) => {
     console.log(`Client connected: ${socket.id} (${socket.data.displayName})`);
     socket.data.rooms = new Set();
+    socket.join(`user:${socket.data.userId}`);
 
     socket.on("create-room", async (payload, callback) => {
       try {

@@ -2,6 +2,7 @@ import { DeepgramClient } from "@deepgram/sdk";
 import fs from "node:fs";
 import { config } from "../config/index";
 import { Transcript, type ITranscriptSegment } from "../models/Transcript";
+import { notifyTranscriptStatus } from "./notificationService";
 
 interface DeepgramUtterance {
   speaker?: number;
@@ -70,11 +71,14 @@ class TranscriptionService {
         `[Transcription] Completed for meeting ${meetingId} — ${segments.length} segments`
       );
 
+      await notifyTranscriptStatus(meetingId, "completed");
+
       return transcript._id.toString();
     } catch (err) {
       transcript.status = "failed";
       await transcript.save();
       console.error(`[Transcription] Failed for meeting ${meetingId}:`, err);
+      await notifyTranscriptStatus(meetingId, "failed");
       throw err;
     }
   }

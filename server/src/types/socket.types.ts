@@ -138,6 +138,13 @@ export interface ProducerClosedPayload {
   producerSocketId: string;
 }
 
+// --- Notification payloads ---
+
+export interface TranscriptReadyPayload {
+  meetingId: string;
+  status: "completed" | "failed";
+}
+
 // --- Socket.IO typed event maps ---
 
 export interface ClientToServerEvents {
@@ -201,6 +208,7 @@ export interface ServerToClientEvents {
   "peer-left": (payload: PeerLeftPayload) => void;
   "new-producer": (payload: NewProducerPayload) => void;
   "producer-closed": (payload: ProducerClosedPayload) => void;
+  "transcript-ready": (payload: TranscriptReadyPayload) => void;
 }
 
 export interface InterServerEvents {}

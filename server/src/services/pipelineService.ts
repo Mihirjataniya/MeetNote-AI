@@ -2,6 +2,7 @@ import fs from "node:fs";
 import { recordingService } from "./recordingService";
 import { storageService } from "./storageService";
 import { transcriptionService } from "./transcriptionService";
+import { notifyTranscriptStatus } from "./notificationService";
 import { Recording } from "../models/Recording";
 import { Meeting } from "../models/Meeting";
 import type { IMeeting } from "../models/Meeting";
@@ -83,6 +84,7 @@ class PipelineService {
         { meetingId, status: "processing" },
         { $set: { status: "failed" } }
       );
+      await notifyTranscriptStatus(meetingId, "failed");
     } finally {
       this.running.delete(roomId);
     }

@@ -1,9 +1,11 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "../contexts/AuthContext";
+import { useSocketContext } from "../contexts/SocketContext";
 import { useModals } from "../contexts/ModalContext";
 import { Icon } from "../components/shell/Icon";
 import { AvatarGroup } from "../components/shell/Avatar";
 import { fetchMeetings, type MeetingSummary } from "../services/meetings";
+import type { TranscriptReadyPayload } from "../types/index";
 
 interface UpcomingMeeting {
   id: string;
@@ -84,6 +86,31 @@ function formatWhen(dateStr?: string): string {
     d.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: false });
 }
 
+function TranscriptBadge({ status }: { status: string | null }) {
+  if (status === "completed") {
+    return (
+      <span className="shrink-0 px-2.5 py-[3px] rounded-full bg-[#22c55e]/10 text-[#22c55e] text-[11px] font-medium">
+        Transcript ready
+      </span>
+    );
+  }
+  if (status === "processing") {
+    return (
+      <span className="shrink-0 px-2.5 py-[3px] rounded-full bg-amber-500/10 text-amber-400 text-[11px] font-medium">
+        Processing...
+      </span>
+    );
+  }
+  if (status === "failed") {
+    return (
+      <span className="shrink-0 px-2.5 py-[3px] rounded-full bg-[#dc2626]/10 text-[#f87171] text-[11px] font-medium">
+        Failed
+      </span>
+    );
+  }
+  return null;
+}
+
 function RecentRow({ m }: { m: MeetingSummary }) {
   return (
     <div className="bg-surface border border-border rounded-[14px] shadow-sm px-4 sm:px-[18px] py-3.5 sm:py-4 flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4 transition-colors duration-[120ms] hover:bg-surface-hover cursor-pointer">
@@ -96,6 +123,7 @@ function RecentRow({ m }: { m: MeetingSummary }) {
             <span className="text-[13.5px] sm:text-[14px] font-semibold text-foreground overflow-hidden text-ellipsis whitespace-nowrap">
               {m.title || "Untitled Meeting"}
             </span>
+            <TranscriptBadge status={m.transcriptStatus} />
           </div>
           <div className="text-[11.5px] sm:text-[12px] text-tertiary mt-[3px]">
             {formatWhen(m.startedAt)}
@@ -110,6 +138,7 @@ function RecentRow({ m }: { m: MeetingSummary }) {
 
 export function HomePage() {
   const { user } = useAuth();
+  const { socket } = useSocketContext();
   const { openStartMeeting, openScheduleMeeting } = useModals();
   const [recentMeetings, setRecentMeetings] = useState<MeetingSummary[]>([]);
   const [loadingMeetings, setLoadingMeetings] = useState(true);
@@ -120,6 +149,30 @@ export function HomePage() {
       .catch((err) => console.error("Failed to load meetings:", err))
       .finally(() => setLoadingMeetings(false));
   }, []);
+
+  useEffect(() => {
+    if (!socket) return;
+
+    const handleTranscriptReady = (payload: TranscriptReadyPayload) => {
+      setRecentMeetings((prev) => {
+        const exists = prev.some((m) => m.id === payload.meetingId);
+        if (!exists) {
+          fetchMeetings(10).then(setRecentMeetings).catch(console.error);
+          return prev;
+        }
+        return prev.map((m) =>
+          m.id === payload.meetingId
+            ? { ...m, transcriptStatus: payload.status }
+            : m
+        );
+      });
+    };
+
+    socket.on("transcript-ready", handleTranscriptReady);
+    return () => {
+      socket.off("transcript-ready", handleTranscriptReady);
+    };
+  }, [socket]);
 
   const now = new Date();
   const dateStr = now.toLocaleDateString("en-US", {

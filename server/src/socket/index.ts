@@ -11,8 +11,22 @@ import type {
   SocketData,
 } from "../types/index";
 
+type TypedIO = Server<
+  ClientToServerEvents,
+  ServerToClientEvents,
+  InterServerEvents,
+  SocketData
+>;
+
+let ioInstance: TypedIO | null = null;
+
+export function getIO(): TypedIO {
+  if (!ioInstance) throw new Error("Socket.IO not initialized");
+  return ioInstance;
+}
+
 export function createSocketServer(httpServer: HttpServer) {
-  const io = new Server<
+  const io: TypedIO = new Server<
     ClientToServerEvents,
     ServerToClientEvents,
     InterServerEvents,
@@ -45,6 +59,7 @@ export function createSocketServer(httpServer: HttpServer) {
   registerMediasoupHandlers(io);
   registerRoomHandlers(io);
 
+  ioInstance = io;
   console.log("Socket.IO server initialized");
 
   return io;

@@ -19,7 +19,8 @@
       "PowerShell(npm install *)",
       "PowerShell(\\(Get-NetIPAddress -AddressFamily IPv4 | Where-Object { $_.InterfaceAlias -notmatch 'Loopback' -and $_.IPAddress -notmatch '^169' }\\).IPAddress)",
       "Bash(npx tsc *)",
-      "PowerShell(ffmpeg *)"
+      "PowerShell(ffmpeg *)",
+      "Bash(Get-ChildItem *)"
     ]
   }
 }

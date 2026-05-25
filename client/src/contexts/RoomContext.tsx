@@ -11,6 +11,8 @@ import { useAuth } from "./AuthContext";
 import { useSocket } from "../hooks/useSocket";
 import type { TypedSocket } from "../hooks/useSocket";
 import { useMediasoup } from "../hooks/useMediasoup";
+import { useRecorder } from "../hooks/useRecorder";
+import { uploadRecording } from "../services/recordings";
 import { isError } from "../types/index";
 import type {
   ParticipantInfo,
@@ -21,6 +23,7 @@ import type {
 
 interface RoomState {
   roomId: string | null;
+  meetingId: string | null;
   participants: ParticipantInfo[];
   connected: boolean;
   localStream: MediaStream | null;
@@ -35,7 +38,9 @@ interface RoomActions {
   createRoom: () => void;
   joinRoom: (roomId: string) => void;
   leaveRoom: () => void;
+  clearMeetingId: () => void;
   startMedia: () => void;
+  muteTrack: (kind: "audio" | "video", muted: boolean) => void;
   startScreenShare: () => void;
   stopScreenShare: () => void;
 }
@@ -56,6 +61,7 @@ export function RoomProvider({ children }: { children: ReactNode }) {
   const { token } = useAuth();
   const { getSocket, connected, connect, disconnect } = useSocket(token);
   const [roomId, setRoomId] = useState<string | null>(null);
+  const [meetingId, setMeetingId] = useState<string | null>(null);
   const [participants, setParticipants] = useState<ParticipantInfo[]>([]);
   const [error, setError] = useState<string | null>(null);
 
@@ -77,10 +83,13 @@ export function RoomProvider({ children }: { children: ReactNode }) {
     remoteScreenStreams,
     screenStream,
     startProducing,
+    muteTrack,
     startScreenShare: startScreenShareFn,
     stopScreenShare,
     close,
   } = useMediasoup(socket, roomId);
+
+  const { startRecording, stopRecording } = useRecorder();
 
   useEffect(() => {
     if (!socket) return;
@@ -104,6 +113,10 @@ export function RoomProvider({ children }: { children: ReactNode }) {
     };
   }, [socket]);
 
+  useEffect(() => {
+    if (localStream) startRecording(localStream);
+  }, [localStream, startRecording]);
+
   const createRoom = useCallback(() => {
     if (!socket?.connected) return;
     setError(null);
@@ -115,6 +128,7 @@ export function RoomProvider({ children }: { children: ReactNode }) {
       }
       const res = response as RoomCreatedPayload;
       setRoomId(res.roomId);
+      setMeetingId(res.meetingId);
       setParticipants(res.participants);
     });
   }, [socket]);
@@ -131,21 +145,38 @@ export function RoomProvider({ children }: { children: ReactNode }) {
         }
         const res = response as RoomCreatedPayload;
         setRoomId(res.roomId);
+        setMeetingId(res.meetingId);
         setParticipants(res.participants);
       });
     },
     [socket]
   );
 
-  const leaveRoom = useCallback(() => {
-    if (roomId && socket) {
+  const leaveRoom = useCallback(async () => {
+    const currentRoomId = roomId;
+    const currentSocket = socket;
+
+    const blob = await stopRecording();
+    if (blob && currentRoomId) {
+      try {
+        await uploadRecording(currentRoomId, blob);
+      } catch (err) {
+        console.error("[Recording] Upload failed:", err);
+      }
+    }
+
+    if (currentRoomId && currentSocket) {
       close();
-      socket.emit("leave-room", { roomId });
+      currentSocket.emit("leave-room", { roomId: currentRoomId });
     }
     setRoomId(null);
     setParticipants([]);
     setError(null);
-  }, [roomId, socket, close]);
+  }, [roomId, socket, close, stopRecording]);
+
+  const clearMeetingId = useCallback(() => {
+    setMeetingId(null);
+  }, []);
 
   const startMedia = useCallback(() => {
     setError(null);
@@ -161,6 +192,7 @@ export function RoomProvider({ children }: { children: ReactNode }) {
     <RoomContext.Provider
       value={{
         roomId,
+        meetingId,
         participants,
         connected,
         localStream,
@@ -172,7 +204,9 @@ export function RoomProvider({ children }: { children: ReactNode }) {
         createRoom,
         joinRoom,
         leaveRoom,
+        clearMeetingId,
         startMedia,
+        muteTrack,
         startScreenShare,
         stopScreenShare,
       }}

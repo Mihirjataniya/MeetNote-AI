@@ -56,10 +56,11 @@ export function registerRoomHandlers(io: TypedServer): void {
           });
         }
 
-        await recordingService.startRecording(room.roomId);
+        recordingService.startRecording(room.roomId);
 
         callback({
           roomId: room.roomId,
+          meetingId: room.meetingId,
           participants: roomService.getParticipants(room.roomId),
         });
       } catch {
@@ -73,9 +74,7 @@ export function registerRoomHandlers(io: TypedServer): void {
           callback({ message: "Room ID is required" });
           return;
         }
-        console.log("Attempting to join room: ", payload.roomId);
         const room = roomService.getRoom(payload.roomId);
-        console.log("ROOM : ", room);
         if (!room) {
           callback({ message: "Room not found" });
           return;
@@ -118,6 +117,7 @@ export function registerRoomHandlers(io: TypedServer): void {
 
         callback({
           roomId: payload.roomId,
+          meetingId: room.meetingId,
           participants: roomService.getParticipants(payload.roomId),
         });
       } catch {
@@ -125,42 +125,52 @@ export function registerRoomHandlers(io: TypedServer): void {
       }
     });
 
-    socket.on("leave-room", (payload) => {
-      try {
-        if (!payload?.roomId) return;
+    socket.on("leave-room", async (payload) => {
+      if (!payload?.roomId) return;
 
-        const room = roomService.getRoom(payload.roomId);
-        const meetingId = room?.meetingId;
+      const room = roomService.getRoom(payload.roomId);
+      const meetingId = room?.meetingId;
+      const isLastParticipant = room?.participants.size === 1
+        && room.participants.has(socket.id);
 
-        const removed = roomService.removeParticipant(
-          payload.roomId,
-          socket.id
-        );
-        if (!removed) return;
-
-        socket.leave(payload.roomId);
-        socket.data.rooms.delete(payload.roomId);
-
-        if (meetingId) {
-          const updatedRoom = roomService.getRoom(payload.roomId);
-          if (!updatedRoom || updatedRoom.participants.size === 0) {
-            meetingService.endMeeting(meetingId);
-            pipelineService
-              .run(payload.roomId, meetingId)
-              .catch((err) => console.error("[Pipeline] Failed:", err));
-          } else {
-            meetingService.removeParticipant(meetingId, socket.data.userId);
-          }
-        }
-
-        socket.to(payload.roomId).emit("peer-left", {
-          roomId: payload.roomId,
-          socketId: socket.id,
-          displayName: removed.displayName,
-        });
-      } catch {
-        // silently handle — leave is fire-and-forget
+      let recordingResult = null;
+      if (isLastParticipant && meetingId) {
+        recordingResult = recordingService.stopRecording(payload.roomId);
       }
+
+      let removed;
+      try {
+        removed = roomService.removeParticipant(payload.roomId, socket.id);
+      } catch (err) {
+        console.error(`[Room] removeParticipant threw for ${payload.roomId}:`, err);
+        removed = room?.participants.get(socket.id);
+        room?.participants.delete(socket.id);
+        room?.peerMedia.delete(socket.id);
+      }
+
+      if (!removed) return;
+
+      socket.leave(payload.roomId);
+      socket.data.rooms.delete(payload.roomId);
+
+      if (meetingId && isLastParticipant) {
+        await meetingService.endMeeting(meetingId).catch((err) =>
+          console.error("[Meeting] endMeeting failed:", err)
+        );
+        pipelineService
+          .run(payload.roomId, meetingId, recordingResult)
+          .catch((err) => console.error("[Pipeline] Failed:", err));
+      } else if (meetingId) {
+        meetingService
+          .removeParticipant(meetingId, socket.data.userId)
+          .catch((err) => console.error("[Meeting] removeParticipant failed:", err));
+      }
+
+      socket.to(payload.roomId).emit("peer-left", {
+        roomId: payload.roomId,
+        socketId: socket.id,
+        displayName: removed.displayName,
+      });
     });
 
     socket.on("get-participants", (payload, callback) => {
@@ -185,25 +195,42 @@ export function registerRoomHandlers(io: TypedServer): void {
       }
     });
 
-    socket.on("disconnect", (reason) => {
+    socket.on("disconnect", async (reason) => {
       console.log(`Client disconnected: ${socket.id}, reason: ${reason}`);
 
       for (const roomId of socket.data.rooms) {
         const room = roomService.getRoom(roomId);
         const meetingId = room?.meetingId;
+        const isLastParticipant = room?.participants.size === 1
+          && room.participants.has(socket.id);
 
-        const removed = roomService.removeParticipant(roomId, socket.id);
+        let recordingResult = null;
+        if (isLastParticipant && meetingId) {
+          recordingResult = recordingService.stopRecording(roomId);
+        }
+
+        let removed;
+        try {
+          removed = roomService.removeParticipant(roomId, socket.id);
+        } catch (err) {
+          console.error(`[Room] removeParticipant threw for ${roomId}:`, err);
+          removed = room?.participants.get(socket.id);
+          room?.participants.delete(socket.id);
+          room?.peerMedia.delete(socket.id);
+        }
+
         if (removed) {
-          if (meetingId) {
-            const updatedRoom = roomService.getRoom(roomId);
-            if (!updatedRoom || updatedRoom.participants.size === 0) {
-              meetingService.endMeeting(meetingId);
-              pipelineService
-                .run(roomId, meetingId)
-                .catch((err) => console.error("[Pipeline] Failed:", err));
-            } else {
-              meetingService.removeParticipant(meetingId, socket.data.userId);
-            }
+          if (meetingId && isLastParticipant) {
+            await meetingService.endMeeting(meetingId).catch((err) =>
+              console.error("[Meeting] endMeeting failed:", err)
+            );
+            pipelineService
+              .run(roomId, meetingId, recordingResult)
+              .catch((err) => console.error("[Pipeline] Failed:", err));
+          } else if (meetingId) {
+            meetingService
+              .removeParticipant(meetingId, socket.data.userId)
+              .catch((err) => console.error("[Meeting] removeParticipant failed:", err));
           }
 
           socket.to(roomId).emit("peer-left", {

@@ -2,12 +2,13 @@ import { useEffect, useRef } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import { RoomProvider, useRoom } from "../contexts/RoomContext";
 import { Room } from "../components/Room";
+import { TranscriptModal } from "../components/TranscriptModal";
 import { Icon } from "../components/shell/Icon";
 
 function MeetingContent() {
   const { roomId: urlRoomId } = useParams<{ roomId: string }>();
   const navigate = useNavigate();
-  const { roomId, connected, error, createRoom, joinRoom } = useRoom();
+  const { roomId, meetingId, connected, error, createRoom, joinRoom, clearMeetingId } = useRoom();
   const initiated = useRef(false);
 
   useEffect(() => {
@@ -28,6 +29,20 @@ function MeetingContent() {
   }, [urlRoomId, roomId, navigate]);
 
   if (roomId) return <Room />;
+
+  if (meetingId) {
+    return (
+      <div className="h-full flex items-center justify-center bg-[#0a0a0a]">
+        <TranscriptModal
+          meetingId={meetingId}
+          onClose={() => {
+            clearMeetingId();
+            navigate("/home");
+          }}
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="h-full flex flex-col items-center justify-center bg-[#0a0a0a] text-white px-4">

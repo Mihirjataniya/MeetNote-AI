@@ -9,7 +9,11 @@ import type { IMeeting } from "../models/Meeting";
 class PipelineService {
   private running = new Set<string>();
 
-  async run(roomId: string, meetingId: string): Promise<void> {
+  async run(
+    roomId: string,
+    meetingId: string,
+    recordingResult?: { webmPaths: string[]; roomDir: string; startedAt: Date } | null
+  ): Promise<void> {
     if (this.running.has(roomId)) return;
     this.running.add(roomId);
 
@@ -26,19 +30,23 @@ class PipelineService {
       recording.stoppedAt = new Date();
       await recording.save();
 
-      const result = await recordingService.stopRecording(roomId);
+      const result = recordingResult ?? recordingService.stopRecording(roomId);
       if (!result || result.webmPaths.length === 0) {
-        console.warn(`[Pipeline] No audio files for room ${roomId}`);
+        console.error(`[Pipeline] No audio files for room ${roomId}`);
         recording.status = "failed";
         await recording.save();
         return;
       }
 
+      console.log(`[Pipeline] ${result.webmPaths.length} file(s) to process for room ${roomId}`);
+
+      console.log(`[Pipeline] Uploading to Cloudinary…`);
       const cloudinaryFiles = await storageService.uploadAudioFiles(
         result.webmPaths,
         roomId
       );
 
+      console.log(`[Pipeline] Merging to WAV via FFmpeg…`);
       const wavPath = await recordingService.mergeToWav(
         result.webmPaths,
         result.roomDir
@@ -58,6 +66,7 @@ class PipelineService {
         ? meeting.participants.map((p) => p.displayName)
         : [];
 
+      console.log(`[Pipeline] Starting Deepgram transcription…`);
       await transcriptionService.transcribe(
         recording._id.toString(),
         meetingId,

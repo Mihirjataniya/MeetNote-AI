@@ -38,6 +38,7 @@ export function useMediasoup(socket: TypedSocket | null, roomId: string | null) 
   const producerSourceRef = useRef<Map<string, "camera" | "screen">>(new Map());
   const roomIdRef = useRef<string | null>(null);
   const socketRef = useRef<TypedSocket | null>(null);
+  const producingInitRef = useRef(false);
   const receivingInitRef = useRef(false);
   const consumedProducerIds = useRef<Set<string>>(new Set());
   const pendingProducersRef = useRef<PendingProducer[]>([]);
@@ -300,27 +301,63 @@ export function useMediasoup(socket: TypedSocket | null, roomId: string | null) 
   }, [socket, roomId, ensureDevice, createRecvTransport, emitWithAck, consumeProducer]);
 
   const startProducing = useCallback(async () => {
+    if (producingInitRef.current) return;
+    producingInitRef.current = true;
+
     const device = await ensureDevice();
     const sendTransport = await createSendTransport(device);
     await createRecvTransport(device);
 
     if (!navigator.mediaDevices?.getUserMedia) {
+      producingInitRef.current = false;
       throw new Error(
         "Camera/mic access requires HTTPS. Please use a secure connection."
       );
     }
 
-    const stream = await navigator.mediaDevices.getUserMedia({
-      audio: true,
-      video: true,
-    });
-    setLocalStream(stream);
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: true,
+        video: true,
+      });
+      setLocalStream(stream);
 
-    for (const track of stream.getTracks()) {
-      const producer = await sendTransport.produce({ track });
-      producersRef.current.set(producer.id, producer);
+      for (const track of stream.getTracks()) {
+        const producer = await sendTransport.produce({ track });
+        producersRef.current.set(producer.id, producer);
+      }
+    } catch (err) {
+      producingInitRef.current = false;
+      throw err;
     }
   }, [ensureDevice, createSendTransport, createRecvTransport]);
+
+  const muteTrack = useCallback(
+    (kind: "audio" | "video", muted: boolean) => {
+      const currentRoomId = roomIdRef.current;
+      const s = socketRef.current;
+
+      for (const producer of producersRef.current.values()) {
+        if (producer.closed) continue;
+        const isScreen = (producer.appData as Record<string, unknown>)?.source === "screen";
+        if (producer.kind === kind && !isScreen) {
+          if (muted) {
+            producer.pause();
+            if (currentRoomId && s) {
+              s.emit("pause-producer", { roomId: currentRoomId, producerId: producer.id }, () => {});
+            }
+          } else {
+            producer.resume();
+            if (currentRoomId && s) {
+              s.emit("resume-producer", { roomId: currentRoomId, producerId: producer.id }, () => {});
+            }
+          }
+          break;
+        }
+      }
+    },
+    []
+  );
 
   const stopScreenShare = useCallback(() => {
     const producer = screenProducerRef.current;
@@ -397,6 +434,7 @@ export function useMediasoup(socket: TypedSocket | null, roomId: string | null) 
     deviceInitPromise.current = null;
     sendTransportInitPromise.current = null;
     recvTransportInitPromise.current = null;
+    producingInitRef.current = false;
     receivingInitRef.current = false;
     consumedProducerIds.current.clear();
     pendingProducersRef.current = [];
@@ -500,6 +538,7 @@ export function useMediasoup(socket: TypedSocket | null, roomId: string | null) 
     remoteScreenStreams,
     screenStream,
     startProducing,
+    muteTrack,
     startScreenShare,
     stopScreenShare,
     close,

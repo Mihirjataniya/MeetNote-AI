@@ -1,5 +1,4 @@
 import { useState, useEffect, useCallback, useRef } from "react";
-import { useNavigate } from "react-router-dom";
 import { useRoom } from "../contexts/RoomContext";
 import { useAuth } from "../contexts/AuthContext";
 import { LocalVideo } from "./LocalVideo";
@@ -35,12 +34,11 @@ export function Room() {
     error,
     leaveRoom,
     startMedia,
+    muteTrack,
     startScreenShare,
     stopScreenShare,
     socketId,
   } = useRoom();
-
-  const navigate = useNavigate();
 
   const [micOn, setMicOn] = useState(true);
   const [camOn, setCamOn] = useState(true);
@@ -54,8 +52,9 @@ export function Room() {
     localStream.getVideoTracks().forEach((t) => {
       t.enabled = next;
     });
+    muteTrack("video", !next);
     setCamOn(next);
-  }, [localStream, camOn, startMedia]);
+  }, [localStream, camOn, startMedia, muteTrack]);
 
   const handleToggleScreen = useCallback(() => {
     if (screenStream) {
@@ -84,9 +83,10 @@ export function Room() {
       localStream.getAudioTracks().forEach((t) => {
         t.enabled = next;
       });
+      muteTrack("audio", !next);
       setMicOn(next);
     }
-  }, [localStream, micOn]);
+  }, [localStream, micOn, muteTrack]);
 
 
   const copyRoomId = () => {
@@ -99,7 +99,6 @@ export function Room() {
 
   const handleLeave = () => {
     leaveRoom();
-    navigate("/home");
   };
 
   const peerLookup = new Map(

@@ -66,6 +66,7 @@ export interface ErrorPayload {
 
 export interface RoomCreatedPayload {
   roomId: string;
+  meetingId: string | null;
   participants: ParticipantInfo[];
 }
 
@@ -182,6 +183,14 @@ export interface ClientToServerEvents {
     payload: { roomId: string; producerId: string },
     callback: (response: { closed: true } | ErrorPayload) => void
   ) => void;
+  "pause-producer": (
+    payload: { roomId: string; producerId: string },
+    callback: (response: { paused: true } | ErrorPayload) => void
+  ) => void;
+  "resume-producer": (
+    payload: { roomId: string; producerId: string },
+    callback: (response: { resumed: true } | ErrorPayload) => void
+  ) => void;
 }
 
 export interface ServerToClientEvents {
@@ -202,6 +211,8 @@ export function isError(response: unknown): response is ErrorPayload {
     !("producerId" in response) &&
     !("consumerId" in response) &&
     !("connected" in response) &&
-    !("resumed" in response)
+    !("resumed" in response) &&
+    !("paused" in response) &&
+    !("closed" in response)
   );
 }

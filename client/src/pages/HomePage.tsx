@@ -4,6 +4,7 @@ import { useSocketContext } from "../contexts/SocketContext";
 import { useModals } from "../contexts/ModalContext";
 import { Icon } from "../components/shell/Icon";
 import { AvatarGroup } from "../components/shell/Avatar";
+import { MeetingRow } from "../components/MeetingRow";
 import { fetchMeetings, type MeetingSummary } from "../services/meetings";
 import type { TranscriptReadyPayload } from "../types/index";
 
@@ -61,7 +62,7 @@ function UpcomingCard({ m }: { m: UpcomingMeeting }) {
           <AvatarGroup names={m.participants} size={22} max={3} />
           <span className="text-[11px] sm:text-[11.5px] text-tertiary">{m.participants.length} guests</span>
         </div>
-        <button className="h-[30px] px-[11px] rounded-lg bg-accent text-accent-foreground font-medium text-[13px] inline-flex items-center gap-1.5 border border-accent hover:bg-black transition-all duration-150 active:scale-[0.98]">
+        <button className="h-[30px] px-[11px] rounded-lg bg-accent text-accent-foreground font-medium text-[13px] inline-flex items-center gap-1.5 border border-accent hover:bg-accent/80 transition-all duration-150 active:scale-[0.98]">
           <Icon name="video" size={12} /> Join
         </button>
       </div>
@@ -69,72 +70,6 @@ function UpcomingCard({ m }: { m: UpcomingMeeting }) {
   );
 }
 
-function formatDuration(ms?: number): string {
-  if (!ms) return "";
-  const totalMin = Math.round(ms / 60000);
-  if (totalMin < 60) return `${totalMin}m`;
-  const h = Math.floor(totalMin / 60);
-  const m = totalMin % 60;
-  return m > 0 ? `${h}h ${m}m` : `${h}h`;
-}
-
-function formatWhen(dateStr?: string): string {
-  if (!dateStr) return "";
-  const d = new Date(dateStr);
-  return d.toLocaleDateString("en-US", { day: "numeric", month: "short" }) +
-    " · " +
-    d.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: false });
-}
-
-function TranscriptBadge({ status }: { status: string | null }) {
-  if (status === "completed") {
-    return (
-      <span className="shrink-0 px-2.5 py-[3px] rounded-full bg-[#22c55e]/10 text-[#22c55e] text-[11px] font-medium">
-        Transcript ready
-      </span>
-    );
-  }
-  if (status === "processing") {
-    return (
-      <span className="shrink-0 px-2.5 py-[3px] rounded-full bg-amber-500/10 text-amber-400 text-[11px] font-medium">
-        Processing...
-      </span>
-    );
-  }
-  if (status === "failed") {
-    return (
-      <span className="shrink-0 px-2.5 py-[3px] rounded-full bg-[#dc2626]/10 text-[#f87171] text-[11px] font-medium">
-        Failed
-      </span>
-    );
-  }
-  return null;
-}
-
-function RecentRow({ m }: { m: MeetingSummary }) {
-  return (
-    <div className="bg-surface border border-border rounded-[14px] shadow-sm px-4 sm:px-[18px] py-3.5 sm:py-4 flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4 transition-colors duration-[120ms] hover:bg-surface-hover cursor-pointer">
-      <div className="flex items-center gap-3 sm:gap-4 flex-1 min-w-0">
-        <div className="w-9 h-9 rounded-lg bg-surface-hover border border-border flex items-center justify-center text-secondary shrink-0">
-          <Icon name="fileText" size={15} />
-        </div>
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2">
-            <span className="text-[13.5px] sm:text-[14px] font-semibold text-foreground overflow-hidden text-ellipsis whitespace-nowrap">
-              {m.title || "Untitled Meeting"}
-            </span>
-            <TranscriptBadge status={m.transcriptStatus} />
-          </div>
-          <div className="text-[11.5px] sm:text-[12px] text-tertiary mt-[3px]">
-            {formatWhen(m.startedAt)}
-            {m.durationMs ? ` · ${formatDuration(m.durationMs)}` : ""}
-            {` · ${m.participantCount} attendees`}
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
 
 export function HomePage() {
   const { user } = useAuth();
@@ -144,7 +79,7 @@ export function HomePage() {
   const [loadingMeetings, setLoadingMeetings] = useState(true);
 
   useEffect(() => {
-    fetchMeetings(10)
+    fetchMeetings(5)
       .then(setRecentMeetings)
       .catch((err) => console.error("Failed to load meetings:", err))
       .finally(() => setLoadingMeetings(false));
@@ -157,7 +92,7 @@ export function HomePage() {
       setRecentMeetings((prev) => {
         const exists = prev.some((m) => m.id === payload.meetingId);
         if (!exists) {
-          fetchMeetings(10).then(setRecentMeetings).catch(console.error);
+          fetchMeetings(5).then(setRecentMeetings).catch(console.error);
           return prev;
         }
         return prev.map((m) =>
@@ -352,7 +287,7 @@ export function HomePage() {
             </div>
           )}
           {recentMeetings.map((m) => (
-            <RecentRow key={m.id} m={m} />
+            <MeetingRow key={m.id} m={m} />
           ))}
         </div>
       </div>

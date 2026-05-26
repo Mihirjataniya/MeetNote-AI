@@ -1,5 +1,8 @@
 import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
+import { useSocketContext } from "../../contexts/SocketContext";
+import { isError } from "../../types/index";
+import type { RoomCreatedPayload } from "../../types/index";
 import { Toggle } from "../shell/Toggle";
 import { Icon } from "../shell/Icon";
 
@@ -12,11 +15,13 @@ type Tab = "start" | "join";
 
 export function StartMeetingModal({ open, onClose }: StartMeetingModalProps) {
   const navigate = useNavigate();
+  const { socket } = useSocketContext();
   const [tab, setTab] = useState<Tab>("start");
   const [title, setTitle] = useState("Quick sync");
   const [desc, setDesc] = useState("");
   const [autoNotes, setAutoNotes] = useState(true);
   const [joinId, setJoinId] = useState("");
+  const [starting, setStarting] = useState(false);
 
   const handleClose = useCallback(() => {
     onClose();
@@ -34,8 +39,20 @@ export function StartMeetingModal({ open, onClose }: StartMeetingModalProps) {
   if (!open) return null;
 
   const handleStart = () => {
-    handleClose();
-    navigate("/room/new");
+    if (!socket?.connected || starting) return;
+    setStarting(true);
+
+    socket.emit(
+      "create-room",
+      { title: title.trim() || undefined, agenda: desc.trim() || undefined },
+      (response) => {
+        setStarting(false);
+        if (isError(response)) return;
+        const res = response as RoomCreatedPayload;
+        handleClose();
+        navigate(`/room/${res.roomId}`);
+      }
+    );
   };
 
   const handleJoin = () => {
@@ -193,14 +210,15 @@ export function StartMeetingModal({ open, onClose }: StartMeetingModalProps) {
             </button>
             {tab === "start" ? (
               <button
-                className="h-[38px] px-4 rounded-[10px] bg-accent text-accent-foreground text-[14px] font-medium border border-accent hover:bg-black transition-all inline-flex items-center gap-2 active:scale-[0.98]"
+                className="h-[38px] px-4 rounded-[10px] bg-accent text-accent-foreground text-[14px] font-medium border border-accent hover:bg-accent/80 transition-all inline-flex items-center gap-2 active:scale-[0.98] disabled:opacity-50 disabled:pointer-events-none"
                 onClick={handleStart}
+                disabled={starting || !socket?.connected}
               >
-                <Icon name="play" size={11} /> Start meeting
+                <Icon name="play" size={11} /> {starting ? "Starting..." : "Start meeting"}
               </button>
             ) : (
               <button
-                className="h-[38px] px-4 rounded-[10px] bg-accent text-accent-foreground text-[14px] font-medium border border-accent hover:bg-black transition-all inline-flex items-center gap-2 active:scale-[0.98] disabled:opacity-50 disabled:pointer-events-none"
+                className="h-[38px] px-4 rounded-[10px] bg-accent text-accent-foreground text-[14px] font-medium border border-accent hover:bg-accent/80 transition-all inline-flex items-center gap-2 active:scale-[0.98] disabled:opacity-50 disabled:pointer-events-none"
                 onClick={handleJoin}
                 disabled={!joinId.trim()}
               >

@@ -1,26 +1,102 @@
 import { Router } from "express";
+import { Types } from "mongoose";
 import { requireAuth } from "../middleware/auth";
 import { meetingService } from "../services/meetingService";
+import { Meeting } from "../models/Meeting";
 import { Transcript } from "../models/Transcript";
 import { Recording } from "../models/Recording";
+
+function qp(val: unknown): string | undefined {
+  const s = Array.isArray(val) ? val[0] : val;
+  return typeof s === "string" && s ? s : undefined;
+}
+
+function escapeRegex(str: string): string {
+  return str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
 
 const router = Router();
 
 router.get("/", requireAuth, async (req, res) => {
   try {
-    const limitParam = Array.isArray(req.query.limit)
-      ? req.query.limit[0]
-      : req.query.limit;
+    const page = Math.max(parseInt(qp(req.query.page) ?? "1") || 1, 1);
     const limit = Math.min(
-      parseInt(limitParam as string) || 20,
+      Math.max(parseInt(qp(req.query.limit) ?? "20") || 20, 1),
       100
     );
-    const meetings = await meetingService.getUserMeetings(
-      req.user!.userId,
-      limit
-    );
+    const q = qp(req.query.q);
+    const status = qp(req.query.status);
+    const transcriptStatus = qp(req.query.transcriptStatus);
+    const userId = req.user!.userId;
 
-    const meetingIds = meetings.map((m) => m._id);
+    let meetingDocs: Array<{
+      _id: Types.ObjectId;
+      title?: string;
+      status: string;
+      participants: Array<{ userId: Types.ObjectId; displayName: string }>;
+      durationMs?: number;
+      startedAt?: Date;
+      endedAt?: Date;
+    }>;
+    let total: number;
+
+    if (transcriptStatus) {
+      const matchStage: Record<string, unknown> = {
+        "participants.userId": new Types.ObjectId(userId),
+      };
+      if (q) matchStage.title = { $regex: escapeRegex(q), $options: "i" };
+      if (status) matchStage.status = status;
+
+      const tsMatch =
+        transcriptStatus === "none"
+          ? { _transcriptStatus: "none" }
+          : { _transcriptStatus: transcriptStatus };
+
+      const pipeline = [
+        { $match: matchStage },
+        {
+          $lookup: {
+            from: "transcripts",
+            localField: "_id",
+            foreignField: "meetingId",
+            as: "_transcript",
+          },
+        },
+        {
+          $addFields: {
+            _transcriptStatus: {
+              $ifNull: [{ $arrayElemAt: ["$_transcript.status", 0] }, "none"],
+            },
+          },
+        },
+        { $match: tsMatch },
+        {
+          $facet: {
+            metadata: [{ $count: "total" }],
+            data: [
+              { $sort: { createdAt: -1 as const } },
+              { $skip: (page - 1) * limit },
+              { $limit: limit },
+            ],
+          },
+        },
+      ];
+
+      const [result] = await Meeting.aggregate(pipeline);
+      total = result.metadata[0]?.total ?? 0;
+      meetingDocs = result.data;
+    } else {
+      const paginated = await meetingService.getUserMeetingsPaginated(userId, {
+        page,
+        limit,
+        q,
+        status,
+      });
+      meetingDocs = paginated.meetings;
+      total = paginated.total;
+    }
+
+    const meetingIds = meetingDocs.map((m) => m._id);
     const [transcripts, recordings] = await Promise.all([
       Transcript.find({ meetingId: { $in: meetingIds } })
         .select("meetingId status")
@@ -37,7 +113,7 @@ router.get("/", requireAuth, async (req, res) => {
       recordings.map((r) => [r.meetingId.toString(), r])
     );
 
-    const result = meetings.map((m) => {
+    const meetings = meetingDocs.map((m) => {
       const id = m._id.toString();
       const transcript = transcriptMap.get(id);
       const recording = recordingMap.get(id);
@@ -54,7 +130,7 @@ router.get("/", requireAuth, async (req, res) => {
       };
     });
 
-    res.json({ meetings: result });
+    res.json({ meetings, total, page, limit });
   } catch (err) {
     console.error("Failed to fetch meetings:", err);
     res.status(500).json({ message: "Failed to fetch meetings" });

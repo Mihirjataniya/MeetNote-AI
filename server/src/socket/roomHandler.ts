@@ -82,7 +82,11 @@ export function registerRoomHandlers(io: TypedServer): void {
         }
 
         if (room.participants.has(socket.id)) {
-          callback({ message: "Already in this room" });
+          callback({
+            roomId: payload.roomId,
+            meetingId: room.meetingId,
+            participants: roomService.getParticipants(payload.roomId),
+          });
           return;
         }
 

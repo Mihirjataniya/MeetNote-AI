@@ -49,7 +49,7 @@ export function ScheduleMeetingModal({ open, onClose, onConfirm }: ScheduleMeeti
             Cancel
           </button>
           <button
-            className="h-[38px] px-4 rounded-[10px] bg-accent text-accent-foreground text-[14px] font-medium border border-accent hover:bg-black transition-all inline-flex items-center gap-2 active:scale-[0.98]"
+            className="h-[38px] px-4 rounded-[10px] bg-accent text-accent-foreground text-[14px] font-medium border border-accent hover:bg-accent/80 transition-all inline-flex items-center gap-2 active:scale-[0.98]"
             onClick={onConfirm}
           >
             <Icon name="calendar" size={12} /> Schedule

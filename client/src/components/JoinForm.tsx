@@ -99,7 +99,7 @@ export function JoinForm() {
           <button
             type="submit"
             disabled={!connected}
-            className="w-full h-11 rounded-[10px] bg-accent text-accent-foreground font-medium text-[15px] inline-flex items-center justify-center gap-2 border border-accent hover:bg-black transition-all duration-150 active:scale-[0.98] disabled:opacity-50 disabled:pointer-events-none"
+            className="w-full h-11 rounded-[10px] bg-accent text-accent-foreground font-medium text-[15px] inline-flex items-center justify-center gap-2 border border-accent hover:bg-accent/80 transition-all duration-150 active:scale-[0.98] disabled:opacity-50 disabled:pointer-events-none"
           >
             <Icon name={mode === "create" ? "play" : "video"} size={12} />
             {mode === "create" ? "Create Room" : "Join Room"}

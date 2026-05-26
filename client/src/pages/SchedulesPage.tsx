@@ -12,7 +12,7 @@ export function SchedulesPage() {
             Manage upcoming meetings and plan your week.
           </p>
         </div>
-        <button className="self-start sm:self-auto h-9 px-4 rounded-[10px] bg-accent text-accent-foreground font-medium text-[14px] inline-flex items-center gap-2 border border-accent hover:bg-black transition-all duration-150 active:scale-[0.98]">
+        <button className="self-start sm:self-auto h-9 px-4 rounded-[10px] bg-accent text-accent-foreground font-medium text-[14px] inline-flex items-center gap-2 border border-accent hover:bg-accent/80 transition-all duration-150 active:scale-[0.98]">
           <Icon name="plus" size={13} /> Schedule meeting
         </button>
       </div>

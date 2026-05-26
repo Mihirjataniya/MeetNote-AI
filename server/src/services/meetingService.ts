@@ -1,6 +1,17 @@
 import { Meeting } from "../models/Meeting";
 import type { IMeeting } from "../models/Meeting";
 
+function escapeRegex(str: string): string {
+  return str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+export interface PaginationOptions {
+  page?: number;
+  limit?: number;
+  q?: string;
+  status?: string;
+}
+
 class MeetingService {
   async createMeeting(
     roomId: string,
@@ -84,6 +95,35 @@ class MeetingService {
       .sort({ createdAt: -1 })
       .limit(limit)
       .lean<IMeeting[]>();
+  }
+
+  async getUserMeetingsPaginated(
+    userId: string,
+    opts: PaginationOptions = {}
+  ): Promise<{ meetings: IMeeting[]; total: number }> {
+    const page = Math.max(opts.page ?? 1, 1);
+    const limit = Math.min(Math.max(opts.limit ?? 20, 1), 100);
+
+    const filter: Record<string, unknown> = {
+      "participants.userId": userId,
+    };
+    if (opts.q) {
+      filter.title = { $regex: escapeRegex(opts.q), $options: "i" };
+    }
+    if (opts.status) {
+      filter.status = opts.status;
+    }
+
+    const [meetings, total] = await Promise.all([
+      Meeting.find(filter)
+        .sort({ createdAt: -1 })
+        .skip((page - 1) * limit)
+        .limit(limit)
+        .lean<IMeeting[]>(),
+      Meeting.countDocuments(filter),
+    ]);
+
+    return { meetings, total };
   }
 
   async getMeetingById(meetingId: string): Promise<IMeeting | null> {

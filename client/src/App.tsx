@@ -1,7 +1,9 @@
 import "./styles/index.css";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
-import { AuthProvider, useAuth } from "./contexts/AuthContext";
-import { SocketProvider } from "./contexts/SocketContext";
+import { QueryClientProvider } from "@tanstack/react-query";
+import { queryClient } from "./queries/queryClient";
+import { useAuthStore } from "./stores/useAuthStore";
+import "./stores/useSocketStore";
 import { AuthPage } from "./components/AuthPage";
 import { AppShell } from "./components/shell/AppShell";
 import { HomePage } from "./pages/HomePage";
@@ -11,8 +13,11 @@ import { SettingsPage } from "./pages/SettingsPage";
 import { ProfilePage } from "./pages/ProfilePage";
 import { MeetingPage } from "./pages/MeetingPage";
 
+useAuthStore.getState().hydrate();
+
 function AppRoutes() {
-  const { user, loading } = useAuth();
+  const user = useAuthStore((s) => s.user);
+  const loading = useAuthStore((s) => s.loading);
 
   if (loading) {
     return (
@@ -52,13 +57,11 @@ function AppRoutes() {
 
 function App() {
   return (
-    <AuthProvider>
-      <SocketProvider>
-        <BrowserRouter>
-          <AppRoutes />
-        </BrowserRouter>
-      </SocketProvider>
-    </AuthProvider>
+    <QueryClientProvider client={queryClient}>
+      <BrowserRouter>
+        <AppRoutes />
+      </BrowserRouter>
+    </QueryClientProvider>
   );
 }
 

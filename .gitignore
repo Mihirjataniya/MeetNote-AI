@@ -29,3 +29,5 @@ CLAUDE.md
 .claude/
 
 server/recordings/
+
+__design_temp/

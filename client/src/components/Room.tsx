@@ -1,10 +1,23 @@
 import { useState, useEffect, useCallback, useRef } from "react";
-import { useRoom } from "../contexts/RoomContext";
-import { useAuth } from "../contexts/AuthContext";
+import { useRoomStore } from "../stores/useRoomStore";
+import { useSocketStore } from "../stores/useSocketStore";
+import { useAuthStore } from "../stores/useAuthStore";
 import { LocalVideo } from "./LocalVideo";
 import { RemoteVideo } from "./RemoteVideo";
 import { Icon } from "./shell/Icon";
 import { Avatar } from "./shell/Avatar";
+
+export interface RoomProps {
+  localStream: MediaStream | null;
+  remoteStreams: Map<string, MediaStream>;
+  remoteScreenStreams: Map<string, MediaStream>;
+  screenStream: MediaStream | null;
+  startMedia: () => void;
+  muteTrack: (kind: "audio" | "video", muted: boolean) => void;
+  startScreenShare: () => void;
+  stopScreenShare: () => void;
+  leaveRoom: () => void;
+}
 
 function formatElapsed(seconds: number): string {
   const h = Math.floor(seconds / 3600);
@@ -22,23 +35,23 @@ function getGridClass(count: number): string {
   return "grid-cols-2 sm:grid-cols-3 max-w-6xl";
 }
 
-export function Room() {
-  const { user } = useAuth();
-  const {
-    roomId,
-    participants,
-    localStream,
-    remoteStreams,
-    remoteScreenStreams,
-    screenStream,
-    error,
-    leaveRoom,
-    startMedia,
-    muteTrack,
-    startScreenShare,
-    stopScreenShare,
-    socketId,
-  } = useRoom();
+export function Room({
+  localStream,
+  remoteStreams,
+  remoteScreenStreams,
+  screenStream,
+  startMedia,
+  muteTrack,
+  startScreenShare,
+  stopScreenShare,
+  leaveRoom,
+}: RoomProps) {
+  const user = useAuthStore((s) => s.user);
+  const roomId = useRoomStore((s) => s.roomId);
+  const participants = useRoomStore((s) => s.participants);
+  const error = useRoomStore((s) => s.error);
+  const socket = useSocketStore((s) => s.socket);
+  const socketId = socket?.id ?? null;
 
   const [micOn, setMicOn] = useState(true);
   const [camOn, setCamOn] = useState(true);

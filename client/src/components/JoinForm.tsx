@@ -1,10 +1,14 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { useRoom } from "../contexts/RoomContext";
+import { useRoomStore } from "../stores/useRoomStore";
+import { useSocketStore } from "../stores/useSocketStore";
 import { Icon } from "./shell/Icon";
 
 export function JoinForm() {
-  const { connected, error, createRoom, joinRoom } = useRoom();
+  const connected = useSocketStore((s) => s.connected);
+  const error = useRoomStore((s) => s.error);
+  const createRoom = useRoomStore((s) => s.createRoom);
+  const joinRoom = useRoomStore((s) => s.joinRoom);
   const [joinRoomId, setJoinRoomId] = useState("");
   const [mode, setMode] = useState<"create" | "join">("create");
 

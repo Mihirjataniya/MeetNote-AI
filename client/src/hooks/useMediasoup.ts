@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Device } from "mediasoup-client";
 import type { Transport, Producer, Consumer } from "mediasoup-client/types";
-import type { TypedSocket } from "./useSocket";
+import type { TypedSocket } from "../stores/useSocketStore";
 import { isError } from "../types/index";
 import type {
   TransportCreatedResponse,

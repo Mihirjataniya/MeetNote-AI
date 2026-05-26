@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
-import { useSocketContext } from "../../contexts/SocketContext";
+import { useSocketStore } from "../../stores/useSocketStore";
 import { isError } from "../../types/index";
 import type { RoomCreatedPayload } from "../../types/index";
 import { Toggle } from "../shell/Toggle";
@@ -15,7 +15,7 @@ type Tab = "start" | "join";
 
 export function StartMeetingModal({ open, onClose }: StartMeetingModalProps) {
   const navigate = useNavigate();
-  const { socket } = useSocketContext();
+  const socket = useSocketStore((s) => s.socket);
   const [tab, setTab] = useState<Tab>("start");
   const [title, setTitle] = useState("Quick sync");
   const [desc, setDesc] = useState("");

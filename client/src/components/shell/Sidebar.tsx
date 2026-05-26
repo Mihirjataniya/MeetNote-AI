@@ -1,8 +1,7 @@
 import { useEffect } from "react";
 import { NavLink, useNavigate, useLocation } from "react-router-dom";
-import { useAuth } from "../../contexts/AuthContext";
-import { useModals } from "../../contexts/ModalContext";
-import { useSidebar } from "../../contexts/SidebarContext";
+import { useAuthStore } from "../../stores/useAuthStore";
+import { useUIStore } from "../../stores/useUIStore";
 import { Icon } from "./Icon";
 import { Avatar } from "./Avatar";
 
@@ -16,10 +15,13 @@ const navItems = [
 const pinnedItems = ["Q3 Roadmap", "Customer interviews", "Weekly 1:1 — Sara"];
 
 function SidebarContent() {
-  const { user } = useAuth();
+  const user = useAuthStore((s) => s.user);
   const navigate = useNavigate();
-  const { openStartMeeting, openScheduleMeeting } = useModals();
-  const { collapsed, toggleCollapsed, setMobileOpen } = useSidebar();
+  const openStartMeeting = useUIStore((s) => s.openStartMeeting);
+  const openScheduleMeeting = useUIStore((s) => s.openScheduleMeeting);
+  const collapsed = useUIStore((s) => s.sidebarCollapsed);
+  const toggleCollapsed = useUIStore((s) => s.toggleSidebarCollapsed);
+  const setMobileOpen = useUIStore((s) => s.setMobileSidebarOpen);
 
   const closeMobile = () => setMobileOpen(false);
 
@@ -159,7 +161,8 @@ function SidebarContent() {
 }
 
 export function Sidebar() {
-  const { mobileOpen, setMobileOpen } = useSidebar();
+  const mobileOpen = useUIStore((s) => s.mobileSidebarOpen);
+  const setMobileOpen = useUIStore((s) => s.setMobileSidebarOpen);
   const location = useLocation();
 
   useEffect(() => {

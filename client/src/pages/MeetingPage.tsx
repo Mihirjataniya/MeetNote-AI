@@ -1,15 +1,54 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useCallback } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
-import { RoomProvider, useRoom } from "../contexts/RoomContext";
+import { useRoomStore } from "../stores/useRoomStore";
+import { useSocketStore } from "../stores/useSocketStore";
+import { useMediasoup } from "../hooks/useMediasoup";
+import { useRecorder } from "../hooks/useRecorder";
+import { uploadRecording } from "../services/recordings";
 import { Room } from "../components/Room";
 import { Icon } from "../components/shell/Icon";
 
 function MeetingContent() {
   const { roomId: urlRoomId } = useParams<{ roomId: string }>();
   const navigate = useNavigate();
-  const { roomId, meetingId, connected, error, createRoom, joinRoom, clearMeetingId } = useRoom();
+
+  const socket = useSocketStore((s) => s.socket);
+  const connected = useSocketStore((s) => s.connected);
+
+  const roomId = useRoomStore((s) => s.roomId);
+  const meetingId = useRoomStore((s) => s.meetingId);
+  const error = useRoomStore((s) => s.error);
+  const createRoom = useRoomStore((s) => s.createRoom);
+  const joinRoom = useRoomStore((s) => s.joinRoom);
+  const clearMeetingId = useRoomStore((s) => s.clearMeetingId);
+
+  const {
+    localStream,
+    remoteStreams,
+    remoteScreenStreams,
+    screenStream,
+    startProducing,
+    muteTrack,
+    startScreenShare,
+    stopScreenShare,
+    close,
+  } = useMediasoup(socket, roomId);
+
+  const { startRecording, stopRecording } = useRecorder();
+
   const initiated = useRef(false);
 
+  // Set up peer-joined/peer-left listeners
+  useEffect(() => {
+    return useRoomStore.getState().setupSocketListeners();
+  }, [socket]);
+
+  // Auto-start recording when local stream is available
+  useEffect(() => {
+    if (localStream) startRecording(localStream);
+  }, [localStream, startRecording]);
+
+  // Create or join room when connected
   useEffect(() => {
     if (!connected || initiated.current || !urlRoomId) return;
     initiated.current = true;
@@ -21,12 +60,14 @@ function MeetingContent() {
     }
   }, [connected, urlRoomId, createRoom, joinRoom]);
 
+  // Redirect from /room/new to /room/:actualRoomId
   useEffect(() => {
     if (urlRoomId === "new" && roomId) {
       navigate(`/room/${roomId}`, { replace: true });
     }
   }, [urlRoomId, roomId, navigate]);
 
+  // Redirect home after leaving
   useEffect(() => {
     if (!roomId && meetingId) {
       const timer = setTimeout(() => {
@@ -37,7 +78,48 @@ function MeetingContent() {
     }
   }, [roomId, meetingId, clearMeetingId, navigate]);
 
-  if (roomId) return <Room />;
+  const handleLeaveRoom = useCallback(async () => {
+    const currentRoomId = useRoomStore.getState().roomId;
+    const blob = await stopRecording();
+    if (blob && currentRoomId) {
+      try {
+        await uploadRecording(currentRoomId, blob);
+      } catch (err) {
+        console.error("[Recording] Upload failed:", err);
+      }
+    }
+    close();
+    useRoomStore.getState().leaveRoom();
+  }, [stopRecording, close]);
+
+  const handleStartMedia = useCallback(() => {
+    useRoomStore.getState().setError(null);
+    startProducing().catch((err: Error) =>
+      useRoomStore.getState().setError(err.message)
+    );
+  }, [startProducing]);
+
+  const handleStartScreenShare = useCallback(() => {
+    useRoomStore.getState().setError(null);
+    startScreenShare().catch((err: Error) =>
+      useRoomStore.getState().setError(err.message)
+    );
+  }, [startScreenShare]);
+
+  if (roomId)
+    return (
+      <Room
+        localStream={localStream}
+        remoteStreams={remoteStreams}
+        remoteScreenStreams={remoteScreenStreams}
+        screenStream={screenStream}
+        startMedia={handleStartMedia}
+        muteTrack={muteTrack}
+        startScreenShare={handleStartScreenShare}
+        stopScreenShare={stopScreenShare}
+        leaveRoom={handleLeaveRoom}
+      />
+    );
 
   if (meetingId) {
     return (
@@ -101,9 +183,11 @@ function MeetingContent() {
 }
 
 export function MeetingPage() {
-  return (
-    <RoomProvider>
-      <MeetingContent />
-    </RoomProvider>
-  );
+  useEffect(() => {
+    return () => {
+      useRoomStore.getState().reset();
+    };
+  }, []);
+
+  return <MeetingContent />;
 }

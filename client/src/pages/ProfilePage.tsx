@@ -1,9 +1,10 @@
-import { useAuth } from "../contexts/AuthContext";
+import { useAuthStore } from "../stores/useAuthStore";
 import { Avatar } from "../components/shell/Avatar";
 import { Icon } from "../components/shell/Icon";
 
 export function ProfilePage() {
-  const { user, logout } = useAuth();
+  const user = useAuthStore((s) => s.user);
+  const logout = useAuthStore((s) => s.logout);
 
   return (
     <div className="px-4 sm:px-6 md:px-8 py-5 sm:py-7 max-w-[800px] mx-auto">

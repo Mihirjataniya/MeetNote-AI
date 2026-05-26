@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useAuth } from "../contexts/AuthContext";
+import { useAuthStore } from "../stores/useAuthStore";
 
 function Logo() {
   return (
@@ -81,7 +81,9 @@ function SidePanel({ side }: { side: "left" | "right" }) {
 }
 
 export function AuthPage() {
-  const { login, register, error } = useAuth();
+  const login = useAuthStore((s) => s.login);
+  const register = useAuthStore((s) => s.register);
+  const error = useAuthStore((s) => s.error);
   const [mode, setMode] = useState<"login" | "register">("login");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");

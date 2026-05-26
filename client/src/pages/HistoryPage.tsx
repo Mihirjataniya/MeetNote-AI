@@ -1,13 +1,7 @@
 import { useState, useEffect, useRef } from "react";
-import { useSocketContext } from "../contexts/SocketContext";
 import { Icon } from "../components/shell/Icon";
 import { MeetingRow } from "../components/MeetingRow";
-import {
-  fetchMeetingsPage,
-  type MeetingSummary,
-  type MeetingsPageResponse,
-} from "../services/meetings";
-import type { TranscriptReadyPayload } from "../types/index";
+import { useMeetingsPage } from "../queries/useMeetingsQuery";
 
 const PAGE_SIZE = 10;
 
@@ -45,20 +39,14 @@ function Pagination({
 }
 
 export function HistoryPage() {
-  const { socket } = useSocketContext();
 
-  const [meetings, setMeetings] = useState<MeetingSummary[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
-
   const [searchQuery, setSearchQuery] = useState("");
   const [debouncedQuery, setDebouncedQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const [transcriptFilter, setTranscriptFilter] = useState("");
   const [filtersVisible, setFiltersVisible] = useState(false);
 
-  const totalPages = Math.ceil(total / PAGE_SIZE);
   const hasActiveFilters = !!(statusFilter || transcriptFilter);
 
   const prevFiltersRef = useRef({ q: "", status: "", transcript: "" });
@@ -76,53 +64,26 @@ export function HistoryPage() {
       prev.transcript !== transcriptFilter;
     if (changed && page !== 1) {
       setPage(1);
-      prevFiltersRef.current = {
-        q: debouncedQuery,
-        status: statusFilter,
-        transcript: transcriptFilter,
-      };
-      return;
     }
     prevFiltersRef.current = {
       q: debouncedQuery,
       status: statusFilter,
       transcript: transcriptFilter,
     };
+  }, [debouncedQuery, statusFilter, transcriptFilter, page]);
 
-    setLoading(true);
-    fetchMeetingsPage({
-      page,
-      limit: PAGE_SIZE,
-      q: debouncedQuery || undefined,
-      status: statusFilter || undefined,
-      transcriptStatus: transcriptFilter || undefined,
-    })
-      .then((res: MeetingsPageResponse) => {
-        setMeetings(res.meetings);
-        setTotal(res.total);
-      })
-      .catch(console.error)
-      .finally(() => setLoading(false));
-  }, [page, debouncedQuery, statusFilter, transcriptFilter]);
+  const { data, isLoading: loading } = useMeetingsPage({
+    page,
+    limit: PAGE_SIZE,
+    q: debouncedQuery || undefined,
+    status: statusFilter || undefined,
+    transcriptStatus: transcriptFilter || undefined,
+  });
 
-  useEffect(() => {
-    if (!socket) return;
+  const meetings = data?.meetings ?? [];
+  const total = data?.total ?? 0;
+  const totalPages = Math.ceil(total / PAGE_SIZE);
 
-    const handleTranscriptReady = (payload: TranscriptReadyPayload) => {
-      setMeetings((prev) =>
-        prev.map((m) =>
-          m.id === payload.meetingId
-            ? { ...m, transcriptStatus: payload.status }
-            : m
-        )
-      );
-    };
-
-    socket.on("transcript-ready", handleTranscriptReady);
-    return () => {
-      socket.off("transcript-ready", handleTranscriptReady);
-    };
-  }, [socket]);
 
   const clearFilters = () => {
     setStatusFilter("");

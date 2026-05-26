@@ -1,6 +1,6 @@
 import { useLocation, useNavigate } from "react-router-dom";
-import { useAuth } from "../../contexts/AuthContext";
-import { useSidebar } from "../../contexts/SidebarContext";
+import { useAuthStore } from "../../stores/useAuthStore";
+import { useUIStore } from "../../stores/useUIStore";
 import { Icon } from "./Icon";
 import { Avatar } from "./Avatar";
 
@@ -15,8 +15,8 @@ const pageLabels: Record<string, string> = {
 export function Topbar() {
   const location = useLocation();
   const navigate = useNavigate();
-  const { user } = useAuth();
-  const { setMobileOpen } = useSidebar();
+  const user = useAuthStore((s) => s.user);
+  const setMobileOpen = useUIStore((s) => s.setMobileSidebarOpen);
   const currentLabel = pageLabels[location.pathname] ?? "Home";
 
   return (

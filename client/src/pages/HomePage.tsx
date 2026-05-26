@@ -1,12 +1,9 @@
-import { useState, useEffect } from "react";
-import { useAuth } from "../contexts/AuthContext";
-import { useSocketContext } from "../contexts/SocketContext";
-import { useModals } from "../contexts/ModalContext";
+import { useAuthStore } from "../stores/useAuthStore";
+import { useUIStore } from "../stores/useUIStore";
 import { Icon } from "../components/shell/Icon";
 import { AvatarGroup } from "../components/shell/Avatar";
 import { MeetingRow } from "../components/MeetingRow";
-import { fetchMeetings, type MeetingSummary } from "../services/meetings";
-import type { TranscriptReadyPayload } from "../types/index";
+import { useRecentMeetings } from "../queries/useMeetingsQuery";
 
 interface UpcomingMeeting {
   id: string;
@@ -72,42 +69,10 @@ function UpcomingCard({ m }: { m: UpcomingMeeting }) {
 
 
 export function HomePage() {
-  const { user } = useAuth();
-  const { socket } = useSocketContext();
-  const { openStartMeeting, openScheduleMeeting } = useModals();
-  const [recentMeetings, setRecentMeetings] = useState<MeetingSummary[]>([]);
-  const [loadingMeetings, setLoadingMeetings] = useState(true);
-
-  useEffect(() => {
-    fetchMeetings(5)
-      .then(setRecentMeetings)
-      .catch((err) => console.error("Failed to load meetings:", err))
-      .finally(() => setLoadingMeetings(false));
-  }, []);
-
-  useEffect(() => {
-    if (!socket) return;
-
-    const handleTranscriptReady = (payload: TranscriptReadyPayload) => {
-      setRecentMeetings((prev) => {
-        const exists = prev.some((m) => m.id === payload.meetingId);
-        if (!exists) {
-          fetchMeetings(5).then(setRecentMeetings).catch(console.error);
-          return prev;
-        }
-        return prev.map((m) =>
-          m.id === payload.meetingId
-            ? { ...m, transcriptStatus: payload.status }
-            : m
-        );
-      });
-    };
-
-    socket.on("transcript-ready", handleTranscriptReady);
-    return () => {
-      socket.off("transcript-ready", handleTranscriptReady);
-    };
-  }, [socket]);
+  const user = useAuthStore((s) => s.user);
+  const openStartMeeting = useUIStore((s) => s.openStartMeeting);
+  const openScheduleMeeting = useUIStore((s) => s.openScheduleMeeting);
+  const { data: recentMeetings = [], isLoading: loadingMeetings } = useRecentMeetings(5);
 
   const now = new Date();
   const dateStr = now.toLocaleDateString("en-US", {

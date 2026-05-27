@@ -7,12 +7,13 @@ interface RoomRecording {
   roomDir: string;
   startedAt: Date;
   uploadedFiles: string[];
+  meetingId: string | null;
 }
 
 class RecordingService {
   private recordings = new Map<string, RoomRecording>();
 
-  startRecording(roomId: string): void {
+  startRecording(roomId: string, meetingId?: string): void {
     if (this.recordings.has(roomId)) return;
 
     const roomDir = path.join(config.recordings.dir, roomId);
@@ -22,6 +23,7 @@ class RecordingService {
       roomDir,
       startedAt: new Date(),
       uploadedFiles: [],
+      meetingId: meetingId ?? null,
     });
 
     console.log(`[Recording] Started for room ${roomId}`);
@@ -94,6 +96,10 @@ class RecordingService {
       });
       ffmpeg.on("error", reject);
     });
+  }
+
+  getMeetingId(roomId: string): string | null {
+    return this.recordings.get(roomId)?.meetingId ?? null;
   }
 
   isRecording(roomId: string): boolean {

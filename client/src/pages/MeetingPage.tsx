@@ -4,7 +4,7 @@ import { useRoomStore } from "../stores/useRoomStore";
 import { useSocketStore } from "../stores/useSocketStore";
 import { useMediasoup } from "../hooks/useMediasoup";
 import { useRecorder } from "../hooks/useRecorder";
-import { uploadRecording } from "../services/recordings";
+import { uploadChunk } from "../services/recordings";
 import { Room } from "../components/Room";
 import { Icon } from "../components/shell/Icon";
 
@@ -34,9 +34,10 @@ function MeetingContent() {
     close,
   } = useMediasoup(socket, roomId);
 
-  const { startRecording, stopRecording } = useRecorder();
+  const { startRecording, stopRecording, flushChunk } = useRecorder();
 
   const initiated = useRef(false);
+  const flushIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // Set up peer-joined/peer-left listeners
   useEffect(() => {
@@ -47,6 +48,26 @@ function MeetingContent() {
   useEffect(() => {
     if (localStream) startRecording(localStream);
   }, [localStream, startRecording]);
+
+  // Periodically flush and upload audio chunks (every 3 minutes)
+  useEffect(() => {
+    if (!localStream || !roomId) return;
+
+    const CHUNK_INTERVAL_MS = 3 * 60 * 1000;
+
+    flushIntervalRef.current = setInterval(async () => {
+      const chunk = await flushChunk();
+      if (chunk) {
+        uploadChunk(roomId, chunk.blob, chunk.chunkIndex, chunk.chunkStartMs, false).catch(
+          (err) => console.error("[Recording] Chunk upload failed:", err)
+        );
+      }
+    }, CHUNK_INTERVAL_MS);
+
+    return () => {
+      if (flushIntervalRef.current) clearInterval(flushIntervalRef.current);
+    };
+  }, [localStream, roomId, flushChunk]);
 
   // Create or join room when connected
   useEffect(() => {
@@ -79,13 +100,20 @@ function MeetingContent() {
   }, [roomId, meetingId, clearMeetingId, navigate]);
 
   const handleLeaveRoom = useCallback(async () => {
+    if (flushIntervalRef.current) clearInterval(flushIntervalRef.current);
     const currentRoomId = useRoomStore.getState().roomId;
-    const blob = await stopRecording();
-    if (blob && currentRoomId) {
+    const result = await stopRecording();
+    if (result && currentRoomId) {
       try {
-        await uploadRecording(currentRoomId, blob);
+        await uploadChunk(
+          currentRoomId,
+          result.blob,
+          result.chunkIndex,
+          result.chunkStartMs,
+          true
+        );
       } catch (err) {
-        console.error("[Recording] Upload failed:", err);
+        console.error("[Recording] Final chunk upload failed:", err);
       }
     }
     close();

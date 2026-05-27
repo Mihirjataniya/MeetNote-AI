@@ -20,6 +20,7 @@ export interface ITranscript extends Document {
   language?: string;
   segments: ITranscriptSegment[];
   fullText?: string;
+  lastProcessedBatch: number;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -58,6 +59,7 @@ const transcriptSchema = new Schema<ITranscript>(
     language: { type: String },
     segments: [transcriptSegmentSchema],
     fullText: { type: String },
+    lastProcessedBatch: { type: Number, default: -1 },
   },
   { timestamps: true }
 );

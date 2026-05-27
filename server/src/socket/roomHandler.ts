@@ -57,7 +57,7 @@ export function registerRoomHandlers(io: TypedServer): void {
           });
         }
 
-        recordingService.startRecording(room.roomId);
+        recordingService.startRecording(room.roomId, meetingId ?? undefined);
 
         callback({
           roomId: room.roomId,

@@ -26,7 +26,10 @@ class TranscriptionService {
     });
 
     try {
-      const deepgram = new DeepgramClient({ apiKey: config.deepgram.apiKey });
+      const deepgram = new DeepgramClient({
+        apiKey: config.deepgram.apiKey,
+        timeoutInSeconds: 300,
+      });
       const audioBuffer = fs.readFileSync(wavPath);
 
       const response = await deepgram.listen.v1.media.transcribeFile(
@@ -59,7 +62,14 @@ class TranscriptionService {
         };
       });
 
-      const fullText = segments.map((s) => `${s.speakerName}: ${s.text}`).join("\n");
+      const fullText = segments.reduce((acc, s, i) => {
+        const prevSpeaker = i > 0 ? segments[i - 1].speakerName : null;
+        if (s.speakerName === prevSpeaker) {
+          return `${acc} ${s.text}`;
+        }
+        const prefix = i > 0 ? "\n\n" : "";
+        return `${acc}${prefix}${s.speakerName}: ${s.text}`;
+      }, "");
 
       transcript.segments = segments;
       transcript.fullText = fullText;

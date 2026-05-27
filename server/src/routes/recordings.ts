@@ -5,6 +5,7 @@ import os from "node:os";
 import path from "node:path";
 import { requireAuth } from "../middleware/auth";
 import { recordingService } from "../services/recordingService";
+import { chunkTranscriptionService } from "../services/chunkTranscriptionService";
 
 const upload = multer({
   storage: multer.diskStorage({
@@ -25,7 +26,7 @@ const upload = multer({
 const router = Router();
 
 router.post("/upload", requireAuth, upload.single("audio"), (req, res) => {
-  const { roomId } = req.body;
+  const { roomId, chunkIndex, chunkStartMs, isFinal } = req.body;
 
   if (!roomId || !req.file) {
     res.status(400).json({ message: "roomId and audio file are required" });
@@ -39,6 +40,19 @@ router.post("/upload", requireAuth, upload.single("audio"), (req, res) => {
   }
 
   recordingService.addUploadedFile(roomId, req.file.path);
+
+  if (chunkIndex != null && chunkStartMs != null) {
+    chunkTranscriptionService
+      .onChunkReceived(
+        roomId,
+        req.file.path,
+        parseInt(chunkStartMs, 10),
+        isFinal === "true",
+        req.user!.userId
+      )
+      .catch((err) => console.error("[ChunkTranscription] Error:", err));
+  }
+
   res.json({ success: true });
 });
 

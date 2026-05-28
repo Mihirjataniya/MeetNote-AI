@@ -5,7 +5,6 @@ import { Transcript, type ITranscriptSegment } from "../models/Transcript";
 import { notifyTranscriptStatus } from "./notificationService";
 
 interface DeepgramUtterance {
-  speaker?: number;
   transcript: string;
   start: number;
   end: number;
@@ -16,8 +15,7 @@ class TranscriptionService {
   async transcribe(
     recordingId: string,
     meetingId: string,
-    wavPath: string,
-    participantNames: string[]
+    wavPath: string
   ): Promise<string> {
     const transcript = await Transcript.create({
       meetingId,
@@ -36,7 +34,6 @@ class TranscriptionService {
         audioBuffer,
         {
           model: "nova-2",
-          diarize: true,
           punctuate: true,
           utterances: true,
           smart_format: true,
@@ -49,27 +46,14 @@ class TranscriptionService {
       const utterances = ((results?.utterances as DeepgramUtterance[]) ?? []);
       const channels = results?.channels as Array<Record<string, unknown>> | undefined;
 
-      const segments: ITranscriptSegment[] = utterances.map((u) => {
-        const speakerIndex = u.speaker ?? 0;
-        const speakerName =
-          participantNames[speakerIndex] ?? `Speaker ${speakerIndex + 1}`;
-        return {
-          speakerName,
-          text: u.transcript,
-          startMs: Math.round(u.start * 1000),
-          endMs: Math.round(u.end * 1000),
-          confidence: u.confidence,
-        };
-      });
+      const segments: ITranscriptSegment[] = utterances.map((u) => ({
+        text: u.transcript,
+        startMs: Math.round(u.start * 1000),
+        endMs: Math.round(u.end * 1000),
+        confidence: u.confidence,
+      }));
 
-      const fullText = segments.reduce((acc, s, i) => {
-        const prevSpeaker = i > 0 ? segments[i - 1].speakerName : null;
-        if (s.speakerName === prevSpeaker) {
-          return `${acc} ${s.text}`;
-        }
-        const prefix = i > 0 ? "\n\n" : "";
-        return `${acc}${prefix}${s.speakerName}: ${s.text}`;
-      }, "");
+      const fullText = segments.map((s) => s.text).join(" ");
 
       transcript.segments = segments;
       transcript.fullText = fullText;

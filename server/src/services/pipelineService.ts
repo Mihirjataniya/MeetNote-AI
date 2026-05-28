@@ -6,8 +6,6 @@ import { chunkTranscriptionService } from "./chunkTranscriptionService";
 import { notifyTranscriptStatus } from "./notificationService";
 import { Recording } from "../models/Recording";
 import { Transcript } from "../models/Transcript";
-import { Meeting } from "../models/Meeting";
-import type { IMeeting } from "../models/Meeting";
 
 class PipelineService {
   private running = new Set<string>();
@@ -69,16 +67,10 @@ class PipelineService {
           result.roomDir
         );
 
-        const meeting = (await Meeting.findById(meetingId)) as IMeeting | null;
-        const participantNames = meeting
-          ? meeting.participants.map((p) => p.displayName)
-          : [];
-
         await transcriptionService.transcribe(
           recording._id.toString(),
           meetingId,
-          wavPath,
-          participantNames
+          wavPath
         );
 
         this.cleanupLocalFiles(result.webmPaths, result.roomDir, wavPath);

@@ -8,8 +8,6 @@ export const TRANSCRIPT_STATUSES = [
 export type TranscriptStatus = (typeof TRANSCRIPT_STATUSES)[number];
 
 export interface TranscriptSegmentDTO {
-  speakerUserId?: string;
-  speakerName: string;
   text: string;
   startMs: number;
   endMs: number;

@@ -12,6 +12,7 @@ export function useRecorder() {
   const chunksRef = useRef<Blob[]>([]);
   const chunkIndexRef = useRef(0);
   const recordingStartRef = useRef(0);
+  const chunkStartTimeRef = useRef(0);
 
   const startRecording = useCallback((stream: MediaStream) => {
     if (recorderRef.current) return;
@@ -29,6 +30,7 @@ export function useRecorder() {
     chunksRef.current = [];
     chunkIndexRef.current = 0;
     recordingStartRef.current = Date.now();
+    chunkStartTimeRef.current = 0;
 
     recorder.ondataavailable = (e) => {
       if (e.data.size > 0) chunksRef.current.push(e.data);
@@ -54,7 +56,7 @@ export function useRecorder() {
       }
 
       const chunkIndex = chunkIndexRef.current;
-      const chunkStartMs = Date.now() - recordingStartRef.current;
+      const chunkStartMs = chunkStartTimeRef.current;
 
       recorder.onstop = () => {
         const blob =
@@ -64,6 +66,7 @@ export function useRecorder() {
 
         chunksRef.current = [];
         chunkIndexRef.current++;
+        chunkStartTimeRef.current = Date.now() - recordingStartRef.current;
 
         const newRecorder = new MediaRecorder(stream, {
           mimeType: "audio/webm;codecs=opus",
@@ -85,7 +88,7 @@ export function useRecorder() {
     return new Promise((resolve) => {
       const recorder = recorderRef.current;
       const chunkIndex = chunkIndexRef.current;
-      const chunkStartMs = Date.now() - recordingStartRef.current;
+      const chunkStartMs = chunkStartTimeRef.current;
 
       if (!recorder || recorder.state === "inactive") {
         const blob =

@@ -4,8 +4,6 @@ import type { TranscriptStatus } from "../types/index";
 import { TRANSCRIPT_STATUSES } from "../types/index";
 
 export interface ITranscriptSegment {
-  speakerUserId?: Types.ObjectId;
-  speakerName: string;
   text: string;
   startMs: number;
   endMs: number;
@@ -27,8 +25,6 @@ export interface ITranscript extends Document {
 
 const transcriptSegmentSchema = new Schema<ITranscriptSegment>(
   {
-    speakerUserId: { type: Schema.Types.ObjectId, ref: "User" },
-    speakerName: { type: String, required: true, trim: true },
     text: { type: String, required: true },
     startMs: { type: Number, required: true },
     endMs: { type: Number, required: true },

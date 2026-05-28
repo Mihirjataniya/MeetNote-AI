@@ -137,6 +137,19 @@ export interface ProducerClosedPayload {
   producerSocketId: string;
 }
 
+export interface SendMessagePayload {
+  roomId: string;
+  text: string;
+}
+
+export interface ChatMessagePayload {
+  id: string;
+  userId: string;
+  displayName: string;
+  text: string;
+  createdAt: string;
+}
+
 export interface TranscriptReadyPayload {
   meetingId: string;
   status: "completed" | "failed";
@@ -196,6 +209,10 @@ export interface ClientToServerEvents {
     payload: { roomId: string; producerId: string },
     callback: (response: { resumed: true } | ErrorPayload) => void
   ) => void;
+  "send-message": (
+    payload: SendMessagePayload,
+    callback: (response: { messageId: string } | ErrorPayload) => void
+  ) => void;
 }
 
 export interface ServerToClientEvents {
@@ -204,6 +221,7 @@ export interface ServerToClientEvents {
   "new-producer": (payload: NewProducerPayload) => void;
   "producer-closed": (payload: ProducerClosedPayload) => void;
   "transcript-ready": (payload: TranscriptReadyPayload) => void;
+  "chat-message": (payload: ChatMessagePayload) => void;
 }
 
 export function isError(response: unknown): response is ErrorPayload {
@@ -219,6 +237,7 @@ export function isError(response: unknown): response is ErrorPayload {
     !("connected" in response) &&
     !("resumed" in response) &&
     !("paused" in response) &&
-    !("closed" in response)
+    !("closed" in response) &&
+    !("messageId" in response)
   );
 }

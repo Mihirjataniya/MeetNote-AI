@@ -45,6 +45,9 @@ import {
   MonitorUp,
   MonitorX,
   MessageSquare,
+  SendHorizontal,
+  Smile,
+  GripVertical,
   type LucideIcon,
 } from "lucide-react";
 
@@ -94,6 +97,9 @@ const iconMap: Record<string, LucideIcon> = {
   screenShare: MonitorUp,
   screenShareOff: MonitorX,
   chat: MessageSquare,
+  send: SendHorizontal,
+  smile: Smile,
+  grip: GripVertical,
 };
 
 interface IconProps {

@@ -6,6 +6,7 @@ import { LocalVideo } from "./LocalVideo";
 import { RemoteVideo } from "./RemoteVideo";
 import { Icon } from "./shell/Icon";
 import { Avatar } from "./shell/Avatar";
+import { ChatPanel } from "./ChatPanel";
 
 export interface RoomProps {
   localStream: MediaStream | null;
@@ -77,8 +78,14 @@ export function Room({
     }
   }, [screenStream, startScreenShare, stopScreenShare]);
   const [showParticipants, setShowParticipants] = useState(false);
+  const [showChat, setShowChat] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
   const [copied, setCopied] = useState(false);
   const [elapsed, setElapsed] = useState(0);
+
+  const [dockEdge, setDockEdge] = useState<"top" | "bottom" | "left" | "right">("bottom");
+  const barRef = useRef<HTMLDivElement>(null);
+  const dragRef = useRef({ active: false, moved: false, startX: 0, startY: 0, pointerId: -1 });
 
   useEffect(() => {
     const interval = setInterval(() => setElapsed((e) => e + 1), 1000);
@@ -102,6 +109,35 @@ export function Room({
   }, [localStream, micOn, muteTrack]);
 
 
+  const toggleParticipants = useCallback(() => {
+    setShowParticipants((p) => {
+      if (!p) setShowChat(false);
+      return !p;
+    });
+  }, []);
+
+  const toggleChat = useCallback(() => {
+    setShowChat((p) => {
+      if (!p) {
+        setShowParticipants(false);
+        setUnreadCount(0);
+      }
+      return !p;
+    });
+  }, []);
+
+  const showChatRef = useRef(showChat);
+  showChatRef.current = showChat;
+
+  useEffect(() => {
+    if (!socket) return;
+    const handler = () => {
+      if (!showChatRef.current) setUnreadCount((c) => c + 1);
+    };
+    socket.on("chat-message", handler);
+    return () => { socket.off("chat-message", handler); };
+  }, [socket]);
+
   const copyRoomId = () => {
     if (roomId) {
       navigator.clipboard.writeText(roomId);
@@ -113,6 +149,57 @@ export function Room({
   const handleLeave = () => {
     leaveRoom();
   };
+
+  const isVertical = dockEdge === "left" || dockEdge === "right";
+  const DRAG_THRESHOLD = 6;
+
+  const onBarPointerDown = useCallback((e: React.PointerEvent) => {
+    dragRef.current = { active: true, moved: false, startX: e.clientX, startY: e.clientY, pointerId: e.pointerId };
+  }, []);
+
+  const onBarPointerMove = useCallback((e: React.PointerEvent) => {
+    const d = dragRef.current;
+    if (!d.active || !barRef.current) return;
+    const dx = e.clientX - d.startX;
+    const dy = e.clientY - d.startY;
+    if (!d.moved) {
+      if (Math.abs(dx) < DRAG_THRESHOLD && Math.abs(dy) < DRAG_THRESHOLD) return;
+      d.moved = true;
+      barRef.current.setPointerCapture(d.pointerId);
+    }
+    barRef.current.style.transform = `translate(${dx}px, ${dy}px)`;
+    barRef.current.style.transition = "none";
+  }, []);
+
+  const onBarPointerUp = useCallback((e: React.PointerEvent) => {
+    const d = dragRef.current;
+    if (!d.active || !barRef.current) return;
+    d.active = false;
+    barRef.current.style.transform = "";
+    barRef.current.style.transition = "";
+    if (!d.moved) return;
+
+    const { innerWidth: w, innerHeight: h } = window;
+    const x = e.clientX;
+    const y = e.clientY;
+    const edges: Record<string, number> = { top: y, bottom: h - y, left: x, right: w - x };
+    const nearest = Object.entries(edges).sort((a, b) => a[1] - b[1])[0][0] as typeof dockEdge;
+    setDockEdge(nearest);
+  }, []);
+
+  const onBarClickCapture = useCallback((e: React.MouseEvent) => {
+    if (dragRef.current.moved) {
+      e.stopPropagation();
+      dragRef.current.moved = false;
+    }
+  }, []);
+
+  const dockClass = {
+    bottom: "bottom-4 sm:bottom-6 left-1/2 -translate-x-1/2",
+    top: "top-4 left-1/2 -translate-x-1/2",
+    left: "left-4 top-1/2 -translate-y-1/2",
+    right: "right-4 top-1/2 -translate-y-1/2",
+  }[dockEdge];
 
   const peerLookup = new Map(
     participants.map((p) => [p.socketId, p.displayName])
@@ -172,7 +259,7 @@ export function Room({
 
         {/* Participant count */}
         <button
-          onClick={() => setShowParticipants((p) => !p)}
+          onClick={toggleParticipants}
           className="flex items-center gap-1.5 px-2 sm:px-2.5 py-1.5 rounded-lg text-[12px] text-white/50 hover:text-white/70 hover:bg-white/[0.06] transition-colors"
         >
           <Icon name="users" size={13} />
@@ -187,85 +274,86 @@ export function Room({
         </div>
       )}
 
-      {/* ── Video area ── */}
-      <div
-        className={`flex-1 p-3 sm:p-4 min-h-0 ${
-          spotlightStream || streamCount > 0 ? "" : "flex items-center justify-center"
-        }`}
-      >
-        {spotlightStream ? (
-          /* ── Spotlight layout ── */
-          <div className="flex flex-col h-full gap-2 sm:gap-3">
-            {/* Main spotlight */}
-            <div className="flex-1 min-h-0">
+      {/* ── Content row (video + chat sidebar on desktop) ── */}
+      <div className="flex-1 flex min-h-0">
+        {/* Video area */}
+        <div
+          className={`flex-1 p-3 sm:p-4 min-h-0 min-w-0 ${
+            spotlightStream || streamCount > 0 ? "" : "flex items-center justify-center"
+          }`}
+        >
+          {spotlightStream ? (
+            /* ── Spotlight layout — screen share only, no camera strip ── */
+            <div className="h-full">
               <ScreenTile stream={spotlightStream} label={spotlightLabel} />
             </div>
-            {/* Camera strip */}
-            <div className="h-28 sm:h-36 flex gap-2 overflow-x-auto shrink-0 pb-1">
+          ) : streamCount > 0 ? (
+            /* ── Grid layout ── */
+            <div
+              className={`grid ${getGridClass(streamCount)} gap-2.5 sm:gap-3 w-full mx-auto h-full auto-rows-fr`}
+            >
               {localStream && (
-                <div className="w-40 sm:w-48 shrink-0 h-full">
-                  <LocalVideo
-                    stream={localStream}
-                    micOn={micOn}
-                    camOn={camOn}
-                    displayName={user?.displayName ?? "You"}
-                  />
-                </div>
+                <LocalVideo
+                  stream={localStream}
+                  micOn={micOn}
+                  camOn={camOn}
+                  displayName={user?.displayName ?? "You"}
+                />
               )}
               {Array.from(remoteStreams.entries()).map(([peerId, stream]) => (
-                <div key={peerId} className="w-40 sm:w-48 shrink-0 h-full">
-                  <RemoteVideo
-                    stream={stream}
-                    displayName={peerLookup.get(peerId) ?? peerId.slice(0, 8)}
-                  />
-                </div>
+                <RemoteVideo
+                  key={peerId}
+                  stream={stream}
+                  displayName={peerLookup.get(peerId) ?? peerId.slice(0, 8)}
+                />
               ))}
             </div>
-          </div>
-        ) : streamCount > 0 ? (
-          /* ── Grid layout ── */
-          <div
-            className={`grid ${getGridClass(streamCount)} gap-2.5 sm:gap-3 w-full mx-auto h-full auto-rows-fr`}
-          >
-            {localStream && (
-              <LocalVideo
-                stream={localStream}
-                micOn={micOn}
-                camOn={camOn}
-                displayName={user?.displayName ?? "You"}
-              />
-            )}
-            {Array.from(remoteStreams.entries()).map(([peerId, stream]) => (
-              <RemoteVideo
-                key={peerId}
-                stream={stream}
-                displayName={peerLookup.get(peerId) ?? peerId.slice(0, 8)}
-              />
-            ))}
-          </div>
-        ) : (
-          /* ── Empty state ── */
-          <div className="flex flex-col items-center justify-center text-center px-4">
-            <div className="w-20 h-20 rounded-2xl bg-white/[0.04] border border-white/[0.08] flex items-center justify-center mb-5">
-              <Icon name="video" size={32} className="text-white/20" />
+          ) : (
+            /* ── Empty state ── */
+            <div className="flex flex-col items-center justify-center text-center px-4">
+              <div className="w-20 h-20 rounded-2xl bg-white/[0.04] border border-white/[0.08] flex items-center justify-center mb-5">
+                <Icon name="video" size={32} className="text-white/20" />
+              </div>
+              <p className="text-[16px] text-white/60 font-medium">Ready to go</p>
+              <p className="text-[13px] text-white/30 mt-1.5 max-w-[280px]">
+                Turn on your camera and microphone to start the meeting
+              </p>
+              <button
+                onClick={startMedia}
+                className="mt-6 h-11 px-6 rounded-xl bg-white text-[#111] font-medium text-[14px] inline-flex items-center gap-2.5 hover:bg-white/90 transition-colors active:scale-[0.98]"
+              >
+                <Icon name="video" size={14} /> Start Camera & Mic
+              </button>
             </div>
-            <p className="text-[16px] text-white/60 font-medium">Ready to go</p>
-            <p className="text-[13px] text-white/30 mt-1.5 max-w-[280px]">
-              Turn on your camera and microphone to start the meeting
-            </p>
-            <button
-              onClick={startMedia}
-              className="mt-6 h-11 px-6 rounded-xl bg-white text-[#111] font-medium text-[14px] inline-flex items-center gap-2.5 hover:bg-white/90 transition-colors active:scale-[0.98]"
-            >
-              <Icon name="video" size={14} /> Start Camera & Mic
-            </button>
+          )}
+        </div>
+
+        {/* Desktop chat sidebar — inside the content row */}
+        {showChat && roomId && (
+          <div className="hidden sm:block w-[330px] shrink-0 p-2 pl-0">
+            <ChatPanel roomId={roomId} onClose={() => setShowChat(false)} />
           </div>
         )}
       </div>
 
-      {/* ── Bottom control bar ── */}
-      <div className="pb-4 sm:pb-6 px-4 flex items-center justify-center shrink-0 relative z-10">
-        <div className="flex items-center gap-1.5 sm:gap-2.5 px-2.5 sm:px-4 py-2 sm:py-3 rounded-2xl bg-white/[0.08] backdrop-blur-md border border-white/[0.08]">
+      {/* ── Floating control bar — draggable, edge-snapping ── */}
+      <div
+        ref={barRef}
+        className={`absolute z-10 transition-all duration-300 ease-out ${dockClass}`}
+        onPointerDown={onBarPointerDown}
+        onPointerMove={onBarPointerMove}
+        onPointerUp={onBarPointerUp}
+        onClickCapture={onBarClickCapture}
+        style={{ touchAction: "none" }}
+      >
+        <div className={`flex ${isVertical ? "flex-col" : "items-center"} gap-1.5 sm:gap-2.5 ${isVertical ? "px-2 sm:px-3 py-2.5 sm:py-4" : "px-2.5 sm:px-4 py-2 sm:py-3"} rounded-2xl bg-white/[0.08] backdrop-blur-md border border-white/[0.08]`}>
+          {/* Drag handle */}
+          <div className="flex items-center justify-center cursor-grab active:cursor-grabbing text-white/25 hover:text-white/40 transition-colors">
+            <Icon name="grip" size={14} style={isVertical ? { transform: "rotate(90deg)" } : undefined} />
+          </div>
+
+          <div className={isVertical ? "h-px w-7 bg-white/[0.1] mx-auto" : "w-px h-7 bg-white/[0.1] mx-0.5 sm:mx-1"} />
+
           {/* Mic */}
           <ControlButton
             icon={micOn ? "mic" : "micOff"}
@@ -292,33 +380,50 @@ export function Room({
             title={supportsScreenShare ? (screenStream ? "Stop sharing" : "Share screen") : "Screen sharing not supported on this device"}
           />
 
-          <div className="w-px h-7 bg-white/[0.1] mx-0.5 sm:mx-1 hidden xs:block" />
+          <div className={isVertical ? "h-px w-7 bg-white/[0.1] mx-auto" : "w-px h-7 bg-white/[0.1] mx-0.5 sm:mx-1 hidden xs:block"} />
 
           {/* Participants */}
           <ControlButton
             icon="users"
             highlight={showParticipants}
-            onClick={() => setShowParticipants((p) => !p)}
+            onClick={toggleParticipants}
             title="Participants"
           />
 
-          {/* Copy link — mobile only */}
-          <ControlButton
-            icon={copied ? "check" : "link"}
-            onClick={copyRoomId}
-            title="Copy room ID"
-            className="sm:hidden"
-          />
+          {/* Chat */}
+          <div className="relative">
+            <ControlButton
+              icon="chat"
+              highlight={showChat}
+              onClick={toggleChat}
+              title="Chat"
+            />
+            {unreadCount > 0 && (
+              <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-blue-600 text-white text-[10px] font-bold inline-flex items-center justify-center pointer-events-none">
+                {unreadCount > 99 ? "99+" : unreadCount}
+              </span>
+            )}
+          </div>
 
-          <div className="w-px h-7 bg-white/[0.1] mx-0.5 sm:mx-1" />
+          {/* Copy link — mobile only */}
+          {!isVertical && (
+            <ControlButton
+              icon={copied ? "check" : "link"}
+              onClick={copyRoomId}
+              title="Copy room ID"
+              className="sm:hidden"
+            />
+          )}
+
+          <div className={isVertical ? "h-px w-7 bg-white/[0.1] mx-auto" : "w-px h-7 bg-white/[0.1] mx-0.5 sm:mx-1"} />
 
           {/* Leave */}
           <button
             onClick={handleLeave}
-            className="h-10 sm:h-11 px-3.5 sm:px-5 rounded-full bg-[#dc2626] hover:bg-[#b91c1c] text-white font-medium text-[13px] inline-flex items-center gap-2 transition-colors active:scale-95"
+            className={`${isVertical ? "w-10 h-10 sm:w-11 sm:h-11" : "h-10 sm:h-11 px-3.5 sm:px-5"} rounded-full bg-[#dc2626] hover:bg-[#b91c1c] text-white font-medium text-[13px] inline-flex items-center justify-center gap-2 transition-colors active:scale-95`}
           >
             <Icon name="phone" size={16} style={{ transform: "rotate(135deg)" }} />
-            <span className="hidden sm:inline">Leave</span>
+            {!isVertical && <span className="hidden sm:inline">Leave</span>}
           </button>
         </div>
       </div>
@@ -329,10 +434,7 @@ export function Room({
           className="absolute inset-0 z-20 flex justify-end"
           onClick={() => setShowParticipants(false)}
         >
-          {/* Backdrop — visible on mobile */}
           <div className="absolute inset-0 bg-black/30 sm:bg-transparent" />
-
-          {/* Panel */}
           <div
             className="relative w-[280px] sm:w-[300px] h-full bg-[#111] border-l border-white/[0.08] flex flex-col shadow-2xl"
             style={{ animation: "slide-in-right 0.2s ease" }}
@@ -349,7 +451,6 @@ export function Room({
                 <Icon name="x" size={14} />
               </button>
             </div>
-
             <div className="flex-1 overflow-y-auto p-3">
               <div className="flex flex-col gap-0.5">
                 {participants.map((p) => (
@@ -373,8 +474,6 @@ export function Room({
                 ))}
               </div>
             </div>
-
-            {/* Invite link */}
             <div className="p-3 border-t border-white/[0.08] shrink-0">
               <button
                 onClick={copyRoomId}
@@ -385,6 +484,16 @@ export function Room({
               </button>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* ── Chat panel — mobile floating ── */}
+      {showChat && roomId && (
+        <div className="sm:hidden">
+          <ChatPanel
+            roomId={roomId}
+            onClose={() => setShowChat(false)}
+          />
         </div>
       )}
     </div>

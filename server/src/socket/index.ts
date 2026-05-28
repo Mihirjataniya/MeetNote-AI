@@ -4,6 +4,7 @@ import { config } from "../config/index";
 import { authService } from "../services/authService";
 import { registerMediasoupHandlers } from "./mediasoupHandler";
 import { registerRoomHandlers } from "./roomHandler";
+import { registerChatHandlers } from "./chatHandler";
 import type {
   ClientToServerEvents,
   ServerToClientEvents,
@@ -58,6 +59,7 @@ export function createSocketServer(httpServer: HttpServer) {
 
   registerMediasoupHandlers(io);
   registerRoomHandlers(io);
+  registerChatHandlers(io);
 
   ioInstance = io;
   console.log("Socket.IO server initialized");

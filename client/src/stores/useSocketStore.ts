@@ -5,9 +5,13 @@ import type {
   ClientToServerEvents,
   ServerToClientEvents,
   TranscriptReadyPayload,
+  NotesReadyPayload,
 } from "../types/index";
 import { useAuthStore } from "./useAuthStore";
-import { updateMeetingTranscriptStatus } from "../queries/useMeetingsQuery";
+import {
+  updateMeetingTranscriptStatus,
+  updateMeetingNotesStatus,
+} from "../queries/useMeetingsQuery";
 
 export type TypedSocket = Socket<ServerToClientEvents, ClientToServerEvents>;
 
@@ -41,6 +45,10 @@ export const useSocketStore = create<SocketStore>((set, get) => ({
 
     socket.on("transcript-ready", (payload: TranscriptReadyPayload) => {
       updateMeetingTranscriptStatus(payload.meetingId, payload.status);
+    });
+
+    socket.on("notes-ready", (payload: NotesReadyPayload) => {
+      updateMeetingNotesStatus(payload.meetingId, payload.status);
     });
 
     socket.connect();

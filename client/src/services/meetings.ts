@@ -11,6 +11,7 @@ export interface MeetingSummary {
   startedAt?: string;
   endedAt?: string;
   transcriptStatus: string | null;
+  notesStatus: string | null;
   recordingStatus: string | null;
 }
 
@@ -60,6 +61,16 @@ export async function fetchMeetingsPage(
   );
   if (!res.ok) throw new Error("Failed to fetch meetings");
   return res.json();
+}
+
+export async function fetchMeetingNotes(meetingId: string): Promise<string> {
+  const res = await fetch(
+    `${API_BASE}/api/meetings/${encodeURIComponent(meetingId)}/notes`,
+    { headers: authHeaders() }
+  );
+  if (!res.ok) throw new Error("Failed to fetch meeting notes");
+  const body = await res.json();
+  return body.meetingNotes ?? "";
 }
 
 export async function fetchTranscriptText(meetingId: string): Promise<string> {

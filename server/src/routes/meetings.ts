@@ -99,7 +99,7 @@ router.get("/", requireAuth, async (req, res) => {
     const meetingIds = meetingDocs.map((m) => m._id);
     const [transcripts, recordings] = await Promise.all([
       Transcript.find({ meetingId: { $in: meetingIds } })
-        .select("meetingId status")
+        .select("meetingId status notesStatus")
         .lean(),
       Recording.find({ meetingId: { $in: meetingIds } })
         .select("meetingId status durationMs")
@@ -126,6 +126,7 @@ router.get("/", requireAuth, async (req, res) => {
         startedAt: m.startedAt,
         endedAt: m.endedAt,
         transcriptStatus: transcript?.status ?? null,
+        notesStatus: transcript?.notesStatus ?? null,
         recordingStatus: recording?.status ?? null,
       };
     });
@@ -148,7 +149,7 @@ router.get("/:id", requireAuth, async (req, res) => {
 
     const [transcript, recording] = await Promise.all([
       Transcript.findOne({ meetingId: meeting._id })
-        .select("status")
+        .select("status notesStatus")
         .lean(),
       Recording.findOne({ meetingId: meeting._id })
         .select("status durationMs cloudinaryUrls")
@@ -170,6 +171,7 @@ router.get("/:id", requireAuth, async (req, res) => {
       startedAt: meeting.startedAt,
       endedAt: meeting.endedAt,
       transcriptStatus: transcript?.status ?? null,
+      notesStatus: transcript?.notesStatus ?? null,
       recordingStatus: recording?.status ?? null,
       cloudinaryUrls: recording?.cloudinaryUrls ?? [],
     });
@@ -204,6 +206,29 @@ router.get("/:id/transcript", requireAuth, async (req, res) => {
   } catch (err) {
     console.error("Failed to fetch transcript:", err);
     res.status(500).json({ message: "Failed to fetch transcript" });
+  }
+});
+
+router.get("/:id/notes", requireAuth, async (req, res) => {
+  try {
+    const meetingId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+    const transcript = await Transcript.findOne({ meetingId })
+      .select("meetingNotes notesStatus")
+      .lean();
+
+    if (!transcript || !transcript.meetingNotes) {
+      res.status(404).json({ message: "Meeting notes not found" });
+      return;
+    }
+
+    res.json({
+      meetingId,
+      meetingNotes: transcript.meetingNotes,
+      notesStatus: transcript.notesStatus,
+    });
+  } catch (err) {
+    console.error("Failed to fetch meeting notes:", err);
+    res.status(500).json({ message: "Failed to fetch meeting notes" });
   }
 });
 

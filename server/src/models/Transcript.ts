@@ -1,7 +1,7 @@
 import { Schema, model } from "mongoose";
 import type { Document, Types } from "mongoose";
-import type { TranscriptStatus } from "../types/index";
-import { TRANSCRIPT_STATUSES } from "../types/index";
+import type { TranscriptStatus, NotesStatus } from "../types/index";
+import { TRANSCRIPT_STATUSES, NOTES_STATUSES } from "../types/index";
 
 export interface ITranscriptSegment {
   text: string;
@@ -18,6 +18,8 @@ export interface ITranscript extends Document {
   language?: string;
   segments: ITranscriptSegment[];
   fullText?: string;
+  meetingNotes?: string;
+  notesStatus?: NotesStatus;
   lastProcessedBatch: number;
   createdAt: Date;
   updatedAt: Date;
@@ -55,6 +57,12 @@ const transcriptSchema = new Schema<ITranscript>(
     language: { type: String },
     segments: [transcriptSegmentSchema],
     fullText: { type: String },
+    meetingNotes: { type: String },
+    notesStatus: {
+      type: String,
+      enum: NOTES_STATUSES,
+      default: "pending",
+    },
     lastProcessedBatch: { type: Number, default: -1 },
   },
   { timestamps: true }

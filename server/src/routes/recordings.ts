@@ -33,9 +33,9 @@ router.post("/upload", requireAuth, upload.single("audio"), (req, res) => {
     return;
   }
 
-  if (!recordingService.isRecording(roomId)) {
+  if (!recordingService.hasRoom(roomId)) {
     try { fs.unlinkSync(req.file.path); } catch {}
-    res.status(409).json({ message: "Recording already ended" });
+    res.status(409).json({ message: "No recording for this room" });
     return;
   }
 

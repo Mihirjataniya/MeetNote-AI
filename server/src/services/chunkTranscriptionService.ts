@@ -129,23 +129,28 @@ class ChunkTranscriptionService {
         return;
       }
 
-      if (!existing) {
-        await Transcript.create({
-          meetingId,
-          recordingId: recording._id,
-          status: isFinal ? "completed" : "processing",
-          language,
-          segments,
-          fullText: this.buildFullText(segments),
-          lastProcessedBatch: batchIndex,
-        });
-      } else {
-        existing.segments.push(...segments);
-        existing.fullText = this.buildFullText(existing.segments as ITranscriptSegment[]);
-        existing.lastProcessedBatch = batchIndex;
-        if (isFinal) existing.status = "completed";
-        await existing.save();
+      const updated = await Transcript.findOneAndUpdate(
+        { meetingId },
+        {
+          $setOnInsert: {
+            meetingId,
+            recordingId: recording._id,
+            language,
+          },
+          $push: { segments: { $each: segments } },
+          $set: {
+            lastProcessedBatch: batchIndex,
+            ...(isFinal ? { status: "completed" } : {}),
+          },
+        },
+        { upsert: true, new: true }
+      );
+
+      if (!updated.status || updated.status === "pending") {
+        updated.status = "processing";
       }
+      updated.fullText = this.buildFullText(updated.segments as ITranscriptSegment[]);
+      await updated.save();
 
       if (isFinal) {
         await notifyTranscriptStatus(meetingId, "completed");

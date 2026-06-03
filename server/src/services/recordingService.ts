@@ -8,6 +8,7 @@ interface RoomRecording {
   startedAt: Date;
   uploadedFiles: string[];
   meetingId: string | null;
+  stopped: boolean;
 }
 
 class RecordingService {
@@ -24,6 +25,7 @@ class RecordingService {
       startedAt: new Date(),
       uploadedFiles: [],
       meetingId: meetingId ?? null,
+      stopped: false,
     });
 
     console.log(`[Recording] Started for room ${roomId}`);
@@ -43,13 +45,23 @@ class RecordingService {
 
   stopRecording(roomId: string): { webmPaths: string[]; roomDir: string; startedAt: Date } | null {
     const recording = this.recordings.get(roomId);
-    if (!recording) return null;
+    if (!recording || recording.stopped) return null;
 
-    this.recordings.delete(roomId);
+    recording.stopped = true;
 
     const webmPaths = recording.uploadedFiles.filter((f) => fs.existsSync(f));
     console.log(`[Recording] Stopped for room ${roomId}, ${webmPaths.length} file(s)`);
     return { webmPaths, roomDir: recording.roomDir, startedAt: recording.startedAt };
+  }
+
+  collectFiles(roomId: string): string[] {
+    const recording = this.recordings.get(roomId);
+    if (!recording) return [];
+    return recording.uploadedFiles.filter((f) => fs.existsSync(f));
+  }
+
+  cleanup(roomId: string): void {
+    this.recordings.delete(roomId);
   }
 
   mergeToWav(webmPaths: string[], roomDir: string): Promise<string> {
@@ -103,6 +115,11 @@ class RecordingService {
   }
 
   isRecording(roomId: string): boolean {
+    const r = this.recordings.get(roomId);
+    return !!r && !r.stopped;
+  }
+
+  hasRoom(roomId: string): boolean {
     return this.recordings.has(roomId);
   }
 }

@@ -53,6 +53,31 @@ export function updateMeetingTranscriptStatus(
   );
 }
 
+export function updateMeetingNotesStatus(
+  meetingId: string,
+  status: string
+) {
+  queryClient.setQueriesData<MeetingSummary[]>(
+    { queryKey: ["meetings", "recent"] },
+    (old) =>
+      old?.map((m) =>
+        m.id === meetingId ? { ...m, notesStatus: status } : m
+      )
+  );
+  queryClient.setQueriesData<MeetingsPageResponse>(
+    { queryKey: ["meetings", "page"] },
+    (old) =>
+      old
+        ? {
+            ...old,
+            meetings: old.meetings.map((m) =>
+              m.id === meetingId ? { ...m, notesStatus: status } : m
+            ),
+          }
+        : old
+  );
+}
+
 export function invalidateMeetings() {
   queryClient.invalidateQueries({ queryKey: meetingKeys.all });
 }

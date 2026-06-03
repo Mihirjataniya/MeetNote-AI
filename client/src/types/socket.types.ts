@@ -155,6 +155,11 @@ export interface TranscriptReadyPayload {
   status: "completed" | "failed";
 }
 
+export interface NotesReadyPayload {
+  meetingId: string;
+  status: "completed" | "failed";
+}
+
 export interface ClientToServerEvents {
   "create-room": (
     payload: CreateRoomPayload,
@@ -221,6 +226,7 @@ export interface ServerToClientEvents {
   "new-producer": (payload: NewProducerPayload) => void;
   "producer-closed": (payload: ProducerClosedPayload) => void;
   "transcript-ready": (payload: TranscriptReadyPayload) => void;
+  "notes-ready": (payload: NotesReadyPayload) => void;
   "chat-message": (payload: ChatMessagePayload) => void;
 }
 

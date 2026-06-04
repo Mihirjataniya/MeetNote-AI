@@ -68,7 +68,8 @@ export function ScheduledMeetingCard({ meeting, onEdit, onCancel }: Props) {
   }
 
   function handleJoin() {
-    navigate(`/room/${meeting.roomId}?scheduledMeetingId=${meeting.id}`);
+    const hostQuery = meeting.isHost ? "&host=1" : "";
+    navigate(`/room/${meeting.roomId}?scheduledMeetingId=${meeting.id}${hostQuery}`);
   }
 
   return (

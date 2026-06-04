@@ -7,8 +7,10 @@ import type {
 
 export interface Participant {
   socketId: string;
+  userId: string;
   displayName: string;
   joinedAt: Date;
+  role: "host" | "participant";
 }
 
 export interface PeerMedia {
@@ -18,10 +20,21 @@ export interface PeerMedia {
   consumers: Map<string, Consumer>;
 }
 
+export interface PendingJoinRequest {
+  socketId: string;
+  userId: string;
+  displayName: string;
+  requestedAt: Date;
+}
+
 export interface Room {
   roomId: string;
   meetingId: string | null;
+  hostUserId: string | null;
   participants: Map<string, Participant>;
+  pendingRequests: Map<string, PendingJoinRequest>;
+  waitingSockets: Set<string>;
+  approvedSockets: Set<string>;
   createdAt: Date;
   router: Router | null;
   peerMedia: Map<string, PeerMedia>;
@@ -29,6 +42,15 @@ export interface Room {
 
 export interface ParticipantInfo {
   socketId: string;
+  userId: string;
   displayName: string;
   joinedAt: string;
+  role: "host" | "participant";
+}
+
+export interface PendingRequestInfo {
+  socketId: string;
+  userId: string;
+  displayName: string;
+  requestedAt: string;
 }

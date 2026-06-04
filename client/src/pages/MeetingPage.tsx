@@ -1,18 +1,26 @@
 import { useEffect, useRef, useCallback } from "react";
-import { useParams, useNavigate, useSearchParams, Link } from "react-router-dom";
+import { useParams, useNavigate, useSearchParams, useLocation, Link } from "react-router-dom";
 import { useRoomStore } from "../stores/useRoomStore";
 import { useSocketStore } from "../stores/useSocketStore";
 import { useMediasoup } from "../hooks/useMediasoup";
 import { useRecorder } from "../hooks/useRecorder";
 import { uploadChunk } from "../services/recordings";
 import { Room } from "../components/Room";
+import { MeetingLobby } from "../components/MeetingLobby";
 import { Icon } from "../components/shell/Icon";
 
 function MeetingContent() {
   const { roomId: urlRoomId } = useParams<{ roomId: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
   const [searchParams] = useSearchParams();
   const scheduledMeetingId = searchParams.get("scheduledMeetingId") ?? undefined;
+  const asHostQuery = searchParams.get("host") === "1";
+  const isNewRoom = urlRoomId === "new";
+  const locationState = (location.state ?? {}) as {
+    title?: string;
+    agenda?: string;
+  };
 
   const socket = useSocketStore((s) => s.socket);
   const connected = useSocketStore((s) => s.connected);
@@ -20,6 +28,8 @@ function MeetingContent() {
   const roomId = useRoomStore((s) => s.roomId);
   const meetingId = useRoomStore((s) => s.meetingId);
   const error = useRoomStore((s) => s.error);
+  const preferredMicOn = useRoomStore((s) => s.preferredMicOn);
+  const preferredCamOn = useRoomStore((s) => s.preferredCamOn);
   const createRoom = useRoomStore((s) => s.createRoom);
   const joinRoom = useRoomStore((s) => s.joinRoom);
   const clearMeetingId = useRoomStore((s) => s.clearMeetingId);
@@ -38,10 +48,11 @@ function MeetingContent() {
 
   const { startRecording, stopRecording, flushChunk } = useRecorder();
 
-  const initiated = useRef(false);
   const flushIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const lobbyJoinTriggered = useRef(false);
+  const initialDevicePrefsApplied = useRef(false);
 
-  // Set up peer-joined/peer-left listeners
+  // Set up peer-joined/peer-left/lobby listeners
   useEffect(() => {
     return useRoomStore.getState().setupSocketListeners();
   }, [socket]);
@@ -50,6 +61,24 @@ function MeetingContent() {
   useEffect(() => {
     if (localStream) startRecording(localStream);
   }, [localStream, startRecording]);
+
+  // Apply mic/cam preferences chosen in lobby to the actual room stream
+  useEffect(() => {
+    if (!localStream || initialDevicePrefsApplied.current) return;
+    initialDevicePrefsApplied.current = true;
+    if (!preferredMicOn) {
+      localStream.getAudioTracks().forEach((t) => {
+        t.enabled = false;
+      });
+      muteTrack("audio", true);
+    }
+    if (!preferredCamOn) {
+      localStream.getVideoTracks().forEach((t) => {
+        t.enabled = false;
+      });
+      muteTrack("video", true);
+    }
+  }, [localStream, preferredMicOn, preferredCamOn, muteTrack]);
 
   // Periodically flush and upload audio chunks (every 3 minutes)
   useEffect(() => {
@@ -71,24 +100,13 @@ function MeetingContent() {
     };
   }, [localStream, roomId, flushChunk]);
 
-  // Create or join room when connected
-  useEffect(() => {
-    if (!connected || initiated.current || !urlRoomId) return;
-    initiated.current = true;
-
-    if (urlRoomId === "new") {
-      createRoom();
-    } else {
-      joinRoom(urlRoomId, scheduledMeetingId ? { scheduledMeetingId } : undefined);
-    }
-  }, [connected, urlRoomId, scheduledMeetingId, createRoom, joinRoom]);
-
   // Redirect from /room/new to /room/:actualRoomId
   useEffect(() => {
-    if (urlRoomId === "new" && roomId) {
-      navigate(`/room/${roomId}`, { replace: true });
+    if (isNewRoom && roomId) {
+      const query = asHostQuery ? "?host=1" : "";
+      navigate(`/room/${roomId}${query}`, { replace: true });
     }
-  }, [urlRoomId, roomId, navigate]);
+  }, [isNewRoom, roomId, navigate, asHostQuery]);
 
   // Redirect home after leaving
   useEffect(() => {
@@ -100,6 +118,24 @@ function MeetingContent() {
       return () => clearTimeout(timer);
     }
   }, [roomId, meetingId, clearMeetingId, navigate]);
+
+  const handleLobbyJoin = useCallback(() => {
+    if (lobbyJoinTriggered.current) return;
+    lobbyJoinTriggered.current = true;
+
+    if (isNewRoom) {
+      createRoom({ title: locationState.title, agenda: locationState.agenda });
+    } else if (urlRoomId) {
+      joinRoom(urlRoomId, scheduledMeetingId ? { scheduledMeetingId } : undefined);
+    }
+  }, [isNewRoom, urlRoomId, scheduledMeetingId, createRoom, joinRoom, locationState.title, locationState.agenda]);
+
+  // Reset trigger if joinRoom failed so user can try again
+  useEffect(() => {
+    if (lobbyJoinTriggered.current && !roomId && error) {
+      lobbyJoinTriggered.current = false;
+    }
+  }, [roomId, error]);
 
   const handleLeaveRoom = useCallback(async () => {
     if (flushIntervalRef.current) clearInterval(flushIntervalRef.current);
@@ -178,9 +214,9 @@ function MeetingContent() {
     );
   }
 
-  return (
-    <div className="h-full flex flex-col items-center justify-center bg-[#0a0a0a] text-white px-4">
-      {error ? (
+  if (error) {
+    return (
+      <div className="h-full flex flex-col items-center justify-center bg-[#0a0a0a] text-white px-4">
         <div className="text-center max-w-sm">
           <div className="w-14 h-14 rounded-2xl bg-[#dc2626]/10 border border-[#dc2626]/20 flex items-center justify-center mx-auto mb-4">
             <Icon name="x" size={24} className="text-[#fca5a5]" />
@@ -196,19 +232,34 @@ function MeetingContent() {
             <Icon name="home" size={13} /> Back to dashboard
           </Link>
         </div>
-      ) : (
+      </div>
+    );
+  }
+
+  if (!urlRoomId) {
+    return null;
+  }
+
+  if (!connected) {
+    return (
+      <div className="h-full flex flex-col items-center justify-center bg-[#0a0a0a] text-white px-4">
         <div className="text-center">
           <div className="w-10 h-10 border-2 border-white/20 border-t-white rounded-full animate-spin mx-auto mb-5" />
           <p className="text-[15px] text-white/70 font-medium">
-            {connected
-              ? urlRoomId === "new"
-                ? "Creating room…"
-                : "Joining room…"
-              : "Connecting to server…"}
+            Connecting to server…
           </p>
         </div>
-      )}
-    </div>
+      </div>
+    );
+  }
+
+  return (
+    <MeetingLobby
+      roomId={urlRoomId}
+      scheduledMeetingId={scheduledMeetingId}
+      isHost={isNewRoom || asHostQuery}
+      onJoin={handleLobbyJoin}
+    />
   );
 }
 

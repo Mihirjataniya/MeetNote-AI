@@ -1,8 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { useSocketStore } from "../../stores/useSocketStore";
-import { isError } from "../../types/index";
-import type { RoomCreatedPayload } from "../../types/index";
 import { Toggle } from "../shell/Toggle";
 import { Icon } from "../shell/Icon";
 
@@ -41,18 +39,13 @@ export function StartMeetingModal({ open, onClose }: StartMeetingModalProps) {
   const handleStart = () => {
     if (!socket?.connected || starting) return;
     setStarting(true);
-
-    socket.emit(
-      "create-room",
-      { title: title.trim() || undefined, agenda: desc.trim() || undefined },
-      (response) => {
-        setStarting(false);
-        if (isError(response)) return;
-        const res = response as RoomCreatedPayload;
-        handleClose();
-        navigate(`/room/${res.roomId}`);
-      }
-    );
+    handleClose();
+    navigate("/room/new?host=1", {
+      state: {
+        title: title.trim() || undefined,
+        agenda: desc.trim() || undefined,
+      },
+    });
   };
 
   const handleJoin = () => {

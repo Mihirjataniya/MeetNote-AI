@@ -50,9 +50,14 @@ export function Room({
   const user = useAuthStore((s) => s.user);
   const roomId = useRoomStore((s) => s.roomId);
   const participants = useRoomStore((s) => s.participants);
+  const pendingRequests = useRoomStore((s) => s.pendingRequests);
+  const isHost = useRoomStore((s) => s.isHost);
+  const approveJoinRequest = useRoomStore((s) => s.approveJoinRequest);
+  const denyJoinRequest = useRoomStore((s) => s.denyJoinRequest);
   const error = useRoomStore((s) => s.error);
   const socket = useSocketStore((s) => s.socket);
   const socketId = socket?.id ?? null;
+  const pendingCount = isHost ? pendingRequests.length : 0;
 
   const [micOn, setMicOn] = useState(true);
   const [camOn, setCamOn] = useState(true);
@@ -260,10 +265,15 @@ export function Room({
         {/* Participant count */}
         <button
           onClick={toggleParticipants}
-          className="flex items-center gap-1.5 px-2 sm:px-2.5 py-1.5 rounded-lg text-[12px] text-white/50 hover:text-white/70 hover:bg-white/[0.06] transition-colors"
+          className="relative flex items-center gap-1.5 px-2 sm:px-2.5 py-1.5 rounded-lg text-[12px] text-white/50 hover:text-white/70 hover:bg-white/[0.06] transition-colors"
         >
           <Icon name="users" size={13} />
           {participants.length}
+          {pendingCount > 0 && (
+            <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-[#facc15] text-[#111] text-[10px] font-bold inline-flex items-center justify-center pointer-events-none">
+              {pendingCount > 9 ? "9+" : pendingCount}
+            </span>
+          )}
         </button>
       </header>
 
@@ -383,12 +393,19 @@ export function Room({
           <div className={isVertical ? "h-px w-7 bg-white/[0.1] mx-auto" : "w-px h-7 bg-white/[0.1] mx-0.5 sm:mx-1 hidden xs:block"} />
 
           {/* Participants */}
-          <ControlButton
-            icon="users"
-            highlight={showParticipants}
-            onClick={toggleParticipants}
-            title="Participants"
-          />
+          <div className="relative">
+            <ControlButton
+              icon="users"
+              highlight={showParticipants}
+              onClick={toggleParticipants}
+              title="Participants"
+            />
+            {pendingCount > 0 && (
+              <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-[#facc15] text-[#111] text-[10px] font-bold inline-flex items-center justify-center pointer-events-none">
+                {pendingCount > 9 ? "9+" : pendingCount}
+              </span>
+            )}
+          </div>
 
           {/* Chat */}
           <div className="relative">
@@ -452,6 +469,48 @@ export function Room({
               </button>
             </div>
             <div className="flex-1 overflow-y-auto p-3">
+              {isHost && pendingRequests.length > 0 && (
+                <div className="mb-3">
+                  <div className="px-3 mb-1.5 text-[10.5px] uppercase tracking-[0.08em] font-medium text-[#facc15]">
+                    Waiting to join ({pendingRequests.length})
+                  </div>
+                  <div className="flex flex-col gap-1">
+                    {pendingRequests.map((r) => (
+                      <div
+                        key={r.socketId}
+                        className="flex items-center gap-2.5 px-3 py-2.5 rounded-xl bg-white/[0.04] border border-white/[0.06]"
+                      >
+                        <Avatar name={r.displayName} size={32} />
+                        <div className="flex-1 min-w-0">
+                          <div className="text-[13px] font-medium text-white truncate">
+                            {r.displayName}
+                          </div>
+                          <div className="text-[11px] text-white/40 mt-0.5">
+                            Wants to join
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          <button
+                            onClick={() => denyJoinRequest(r.socketId)}
+                            title="Deny"
+                            className="w-7 h-7 rounded-lg inline-flex items-center justify-center text-white/55 hover:text-white hover:bg-[#dc2626]/20 transition-colors"
+                          >
+                            <Icon name="x" size={13} />
+                          </button>
+                          <button
+                            onClick={() => approveJoinRequest(r.socketId)}
+                            title="Admit"
+                            className="h-7 px-2.5 rounded-lg bg-white text-[#111] text-[12px] font-semibold inline-flex items-center gap-1 hover:bg-white/90 transition-colors"
+                          >
+                            <Icon name="check" size={11} /> Admit
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="h-px bg-white/[0.06] mt-3" />
+                </div>
+              )}
               <div className="flex flex-col gap-0.5">
                 {participants.map((p) => (
                   <div
@@ -460,11 +519,16 @@ export function Room({
                   >
                     <Avatar name={p.displayName} size={32} />
                     <div className="flex-1 min-w-0">
-                      <div className="text-[13px] font-medium text-white truncate">
-                        {p.displayName}
+                      <div className="text-[13px] font-medium text-white truncate flex items-center gap-1.5">
+                        <span className="truncate">{p.displayName}</span>
                         {p.socketId === socketId && (
-                          <span className="text-[11px] text-white/30 font-normal ml-1.5">
+                          <span className="text-[11px] text-white/30 font-normal">
                             (you)
+                          </span>
+                        )}
+                        {p.role === "host" && (
+                          <span className="px-1.5 py-[1px] rounded text-[9.5px] uppercase tracking-[0.06em] font-semibold bg-[#facc15]/15 text-[#facc15]">
+                            Host
                           </span>
                         )}
                       </div>

@@ -9,8 +9,17 @@ import type {
 
 export interface ParticipantInfo {
   socketId: string;
+  userId: string;
   displayName: string;
   joinedAt: string;
+  role: "host" | "participant";
+}
+
+export interface PendingRequestInfo {
+  socketId: string;
+  userId: string;
+  displayName: string;
+  requestedAt: string;
 }
 
 export interface CreateRoomPayload {
@@ -70,6 +79,51 @@ export interface RoomCreatedPayload {
   roomId: string;
   meetingId: string | null;
   participants: ParticipantInfo[];
+  isHost: boolean;
+  pendingRequests: PendingRequestInfo[];
+}
+
+export interface RequestJoinPayload {
+  roomId: string;
+  scheduledMeetingId?: string;
+}
+
+export interface CancelJoinRequestPayload {
+  roomId: string;
+}
+
+export interface ApproveJoinRequestPayload {
+  roomId: string;
+  socketId: string;
+}
+
+export interface DenyJoinRequestPayload {
+  roomId: string;
+  socketId: string;
+}
+
+export interface RequestJoinAckPayload {
+  roomId: string;
+  state: "waiting-for-host" | "pending-approval";
+}
+
+export interface JoinRequestedPayload {
+  roomId: string;
+  request: PendingRequestInfo;
+}
+
+export interface JoinRequestCancelledPayload {
+  roomId: string;
+  socketId: string;
+}
+
+export interface JoinApprovedPayload {
+  roomId: string;
+}
+
+export interface JoinDeniedPayload {
+  roomId: string;
+  reason?: string;
 }
 
 export interface ParticipantsListPayload {
@@ -232,6 +286,22 @@ export interface ClientToServerEvents {
     payload: SendMessagePayload,
     callback: (response: { messageId: string } | ErrorPayload) => void
   ) => void;
+  "request-join": (
+    payload: RequestJoinPayload,
+    callback: (response: RequestJoinAckPayload | ErrorPayload) => void
+  ) => void;
+  "cancel-join-request": (
+    payload: CancelJoinRequestPayload,
+    callback: (response: { cancelled: true } | ErrorPayload) => void
+  ) => void;
+  "approve-join-request": (
+    payload: ApproveJoinRequestPayload,
+    callback: (response: { approved: true } | ErrorPayload) => void
+  ) => void;
+  "deny-join-request": (
+    payload: DenyJoinRequestPayload,
+    callback: (response: { denied: true } | ErrorPayload) => void
+  ) => void;
 }
 
 export interface ServerToClientEvents {
@@ -243,6 +313,10 @@ export interface ServerToClientEvents {
   "notes-ready": (payload: NotesReadyPayload) => void;
   "chat-message": (payload: ChatMessagePayload) => void;
   "meeting-state-changed": (payload: MeetingStateChangedPayload) => void;
+  "join-requested": (payload: JoinRequestedPayload) => void;
+  "join-request-cancelled": (payload: JoinRequestCancelledPayload) => void;
+  "join-approved": (payload: JoinApprovedPayload) => void;
+  "join-denied": (payload: JoinDeniedPayload) => void;
 }
 
 export function isError(response: unknown): response is ErrorPayload {

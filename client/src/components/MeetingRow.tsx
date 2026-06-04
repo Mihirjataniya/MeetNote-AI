@@ -1,6 +1,5 @@
 /* eslint-disable react-refresh/only-export-components */
 import { useState } from "react";
-import { marked } from "marked";
 import { Icon } from "./shell/Icon";
 import { fetchTranscriptText, fetchMeetingNotes, type MeetingSummary } from "../services/meetings";
 
@@ -86,30 +85,8 @@ async function downloadTranscript(meetingId: string, title?: string) {
 
 async function downloadNotes(meetingId: string, title?: string) {
   const markdown = await fetchMeetingNotes(meetingId);
-  const html = await marked.parse(markdown);
-
-  const container = document.createElement("div");
-  container.innerHTML = html;
-  container.style.fontFamily = "system-ui, -apple-system, sans-serif";
-  container.style.fontSize = "12px";
-  container.style.lineHeight = "1.6";
-  container.style.color = "#1a1a1a";
-  container.style.padding = "20px";
-  document.body.appendChild(container);
-
-  const { default: html2pdf } = await import("html2pdf.js");
-  await html2pdf()
-    .set({
-      margin: [10, 10, 10, 10],
-      filename: `${title || "meeting-notes"}.pdf`,
-      image: { type: "jpeg", quality: 0.98 },
-      html2canvas: { scale: 2 },
-      jsPDF: { unit: "mm", format: "a4", orientation: "portrait" },
-    })
-    .from(container)
-    .save();
-
-  document.body.removeChild(container);
+  const { downloadNotesPdf } = await import("../utils/notesPdf");
+  await downloadNotesPdf(markdown, title);
 }
 
 export function MeetingRow({ m }: { m: MeetingSummary }) {

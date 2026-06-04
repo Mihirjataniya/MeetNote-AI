@@ -1,5 +1,5 @@
 import { useEffect, useRef, useCallback } from "react";
-import { useParams, useNavigate, Link } from "react-router-dom";
+import { useParams, useNavigate, useSearchParams, Link } from "react-router-dom";
 import { useRoomStore } from "../stores/useRoomStore";
 import { useSocketStore } from "../stores/useSocketStore";
 import { useMediasoup } from "../hooks/useMediasoup";
@@ -11,6 +11,8 @@ import { Icon } from "../components/shell/Icon";
 function MeetingContent() {
   const { roomId: urlRoomId } = useParams<{ roomId: string }>();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const scheduledMeetingId = searchParams.get("scheduledMeetingId") ?? undefined;
 
   const socket = useSocketStore((s) => s.socket);
   const connected = useSocketStore((s) => s.connected);
@@ -77,9 +79,9 @@ function MeetingContent() {
     if (urlRoomId === "new") {
       createRoom();
     } else {
-      joinRoom(urlRoomId);
+      joinRoom(urlRoomId, scheduledMeetingId ? { scheduledMeetingId } : undefined);
     }
-  }, [connected, urlRoomId, createRoom, joinRoom]);
+  }, [connected, urlRoomId, scheduledMeetingId, createRoom, joinRoom]);
 
   // Redirect from /room/new to /room/:actualRoomId
   useEffect(() => {

@@ -17,7 +17,7 @@ interface RoomState {
 
 interface RoomActions {
   createRoom: () => void;
-  joinRoom: (roomId: string) => void;
+  joinRoom: (roomId: string, options?: { scheduledMeetingId?: string }) => void;
   leaveRoom: () => void;
   clearMeetingId: () => void;
   setError: (error: string | null) => void;
@@ -56,23 +56,27 @@ export const useRoomStore = create<RoomStore>((set, get) => ({
     });
   },
 
-  joinRoom: (id: string) => {
+  joinRoom: (id: string, options?: { scheduledMeetingId?: string }) => {
     const socket = useSocketStore.getState().socket;
     if (!socket?.connected) return;
     set({ error: null });
 
-    socket.emit("join-room", { roomId: id }, (response) => {
-      if (isError(response)) {
-        set({ error: response.message });
-        return;
+    socket.emit(
+      "join-room",
+      { roomId: id, scheduledMeetingId: options?.scheduledMeetingId },
+      (response) => {
+        if (isError(response)) {
+          set({ error: response.message });
+          return;
+        }
+        const res = response as RoomCreatedPayload;
+        set({
+          roomId: res.roomId,
+          meetingId: res.meetingId,
+          participants: res.participants,
+        });
       }
-      const res = response as RoomCreatedPayload;
-      set({
-        roomId: res.roomId,
-        meetingId: res.meetingId,
-        participants: res.participants,
-      });
-    });
+    );
   },
 
   leaveRoom: () => {

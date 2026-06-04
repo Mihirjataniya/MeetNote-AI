@@ -5,7 +5,12 @@ class RoomService {
   private rooms: Map<string, Room> = new Map();
 
   createRoom(): Room {
-    const roomId = crypto.randomUUID();
+    return this.createRoomWithId(crypto.randomUUID());
+  }
+
+  createRoomWithId(roomId: string): Room {
+    const existing = this.rooms.get(roomId);
+    if (existing) return existing;
     const room: Room = {
       roomId,
       meetingId: null,

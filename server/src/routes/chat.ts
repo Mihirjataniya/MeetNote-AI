@@ -7,7 +7,8 @@ const router = Router();
 
 router.get("/:roomId/messages", requireAuth, async (req, res) => {
   try {
-    const room = roomService.getRoom(req.params.roomId);
+    const roomId = Array.isArray(req.params.roomId) ? req.params.roomId[0] : req.params.roomId;
+    const room = roomService.getRoom(roomId);
     if (!room || !room.meetingId) {
       res.status(404).json({ message: "Room not found" });
       return;

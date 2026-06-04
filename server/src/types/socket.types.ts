@@ -11,10 +11,12 @@ import type { ParticipantInfo } from "./room.types";
 export interface CreateRoomPayload {
   title?: string;
   agenda?: string;
+  scheduledMeetingId?: string;
 }
 
 export interface JoinRoomPayload {
   roomId: string;
+  scheduledMeetingId?: string;
 }
 
 export interface LeaveRoomPayload {
@@ -165,6 +167,18 @@ export interface NotesReadyPayload {
   status: "completed" | "failed";
 }
 
+export type MeetingStateChangeKind =
+  | "created"
+  | "updated"
+  | "cancelled"
+  | "series-cancelled"
+  | "started";
+
+export interface MeetingStateChangedPayload {
+  meetingId: string;
+  kind: MeetingStateChangeKind;
+}
+
 // --- Socket.IO typed event maps ---
 
 export interface ClientToServerEvents {
@@ -235,6 +249,7 @@ export interface ServerToClientEvents {
   "transcript-ready": (payload: TranscriptReadyPayload) => void;
   "notes-ready": (payload: NotesReadyPayload) => void;
   "chat-message": (payload: ChatMessagePayload) => void;
+  "meeting-state-changed": (payload: MeetingStateChangedPayload) => void;
 }
 
 export interface InterServerEvents {}

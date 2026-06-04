@@ -6,12 +6,15 @@ import type {
   ServerToClientEvents,
   TranscriptReadyPayload,
   NotesReadyPayload,
+  MeetingStateChangedPayload,
 } from "../types/index";
 import { useAuthStore } from "./useAuthStore";
 import {
   updateMeetingTranscriptStatus,
   updateMeetingNotesStatus,
 } from "../queries/useMeetingsQuery";
+import { queryClient } from "../queries/queryClient";
+import { scheduleKeys } from "../queries/useSchedulesQuery";
 
 export type TypedSocket = Socket<ServerToClientEvents, ClientToServerEvents>;
 
@@ -49,6 +52,10 @@ export const useSocketStore = create<SocketStore>((set, get) => ({
 
     socket.on("notes-ready", (payload: NotesReadyPayload) => {
       updateMeetingNotesStatus(payload.meetingId, payload.status);
+    });
+
+    socket.on("meeting-state-changed", (_payload: MeetingStateChangedPayload) => {
+      queryClient.invalidateQueries({ queryKey: scheduleKeys.all });
     });
 
     socket.connect();

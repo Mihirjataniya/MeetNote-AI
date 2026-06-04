@@ -3,12 +3,15 @@ import { roomService } from "../services/roomService";
 import { meetingService } from "../services/meetingService";
 import { recordingService } from "../services/recordingService";
 import { pipelineService } from "../services/pipelineService";
+import { scheduleService, ScheduleError } from "../services/scheduleService";
+import { notifyMeetingStateChanged } from "../services/notificationService";
 import { Recording } from "../models/Recording";
 import type {
   ClientToServerEvents,
   ServerToClientEvents,
   InterServerEvents,
   SocketData,
+  JoinRoomPayload,
 } from "../types/index";
 
 type TypedServer = Server<
@@ -23,6 +26,100 @@ type TypedSocket = Socket<
   InterServerEvents,
   SocketData
 >;
+
+async function handleScheduledJoin(
+  socket: TypedSocket,
+  payload: JoinRoomPayload,
+  callback: (
+    response:
+      | { roomId: string; meetingId: string | null; participants: ReturnType<typeof roomService.getParticipants> }
+      | { message: string }
+  ) => void
+): Promise<void> {
+  const userId = socket.data.userId;
+  const displayName = socket.data.displayName;
+  const scheduledMeetingId = payload.scheduledMeetingId!;
+
+  let meeting;
+  let wasScheduled = false;
+  try {
+    const result = await scheduleService.convertScheduledToActive(scheduledMeetingId, userId);
+    meeting = result.meeting;
+    wasScheduled = result.wasScheduled;
+  } catch (err) {
+    if (err instanceof ScheduleError) {
+      callback({ message: err.message });
+    } else {
+      console.error("[Schedule] join failed:", err);
+      callback({ message: "Failed to join scheduled meeting" });
+    }
+    return;
+  }
+
+  if (meeting.roomId !== payload.roomId) {
+    callback({ message: "Room ID mismatch" });
+    return;
+  }
+
+  let room = roomService.getRoom(meeting.roomId);
+  const fresh = !room;
+  if (!room) {
+    room = roomService.createRoomWithId(meeting.roomId);
+    room.meetingId = meeting._id.toString();
+  } else if (!room.meetingId) {
+    room.meetingId = meeting._id.toString();
+  }
+
+  if (wasScheduled) {
+    await Recording.create({
+      meetingId: meeting._id.toString(),
+      recordedBy: userId,
+      status: "recording",
+      startedAt: new Date(),
+    }).catch((e) => console.error("[Schedule] Recording.create failed:", e));
+    recordingService.startRecording(meeting.roomId, meeting._id.toString());
+    notifyMeetingStateChanged([meeting._id.toString()], "started").catch((e) =>
+      console.error("[Schedule] notify started failed:", e)
+    );
+  } else if (fresh) {
+    recordingService.startRecording(meeting.roomId, meeting._id.toString());
+  }
+
+  if (room.participants.has(socket.id)) {
+    callback({
+      roomId: meeting.roomId,
+      meetingId: meeting._id.toString(),
+      participants: roomService.getParticipants(meeting.roomId),
+    });
+    return;
+  }
+
+  const participant = roomService.addParticipant(meeting.roomId, socket.id, displayName);
+  if (!participant) {
+    callback({ message: "Failed to join room" });
+    return;
+  }
+
+  socket.join(meeting.roomId);
+  socket.data.rooms.add(meeting.roomId);
+
+  meetingService.addParticipant(meeting._id.toString(), userId, displayName);
+
+  socket.to(meeting.roomId).emit("peer-joined", {
+    roomId: meeting.roomId,
+    peer: {
+      socketId: socket.id,
+      displayName,
+      joinedAt: participant.joinedAt.toISOString(),
+    },
+  });
+
+  callback({
+    roomId: meeting.roomId,
+    meetingId: meeting._id.toString(),
+    participants: roomService.getParticipants(meeting.roomId),
+  });
+}
 
 export function registerRoomHandlers(io: TypedServer): void {
   io.on("connection", (socket: TypedSocket) => {
@@ -69,12 +166,18 @@ export function registerRoomHandlers(io: TypedServer): void {
       }
     });
 
-    socket.on("join-room", (payload, callback) => {
+    socket.on("join-room", async (payload, callback) => {
       try {
         if (!payload?.roomId || typeof payload.roomId !== "string") {
           callback({ message: "Room ID is required" });
           return;
         }
+
+        if (payload.scheduledMeetingId) {
+          await handleScheduledJoin(socket, payload, callback);
+          return;
+        }
+
         const room = roomService.getRoom(payload.roomId);
         if (!room) {
           callback({ message: "Room not found" });

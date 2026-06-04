@@ -38,10 +38,7 @@ export function AppShell() {
       <ScheduleMeetingModal
         open={scheduleOpen}
         onClose={closeScheduleMeeting}
-        onConfirm={() => {
-          closeScheduleMeeting();
-          setToast("Meeting scheduled · invites sent");
-        }}
+        onCreated={() => setToast("Meeting scheduled")}
       />
 
       {toast && (

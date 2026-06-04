@@ -16,10 +16,12 @@ export interface ParticipantInfo {
 export interface CreateRoomPayload {
   title?: string;
   agenda?: string;
+  scheduledMeetingId?: string;
 }
 
 export interface JoinRoomPayload {
   roomId: string;
+  scheduledMeetingId?: string;
 }
 
 export interface LeaveRoomPayload {
@@ -160,6 +162,18 @@ export interface NotesReadyPayload {
   status: "completed" | "failed";
 }
 
+export type MeetingStateChangeKind =
+  | "created"
+  | "updated"
+  | "cancelled"
+  | "series-cancelled"
+  | "started";
+
+export interface MeetingStateChangedPayload {
+  meetingId: string;
+  kind: MeetingStateChangeKind;
+}
+
 export interface ClientToServerEvents {
   "create-room": (
     payload: CreateRoomPayload,
@@ -228,6 +242,7 @@ export interface ServerToClientEvents {
   "transcript-ready": (payload: TranscriptReadyPayload) => void;
   "notes-ready": (payload: NotesReadyPayload) => void;
   "chat-message": (payload: ChatMessagePayload) => void;
+  "meeting-state-changed": (payload: MeetingStateChangedPayload) => void;
 }
 
 export function isError(response: unknown): response is ErrorPayload {

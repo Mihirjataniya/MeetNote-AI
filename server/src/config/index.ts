@@ -13,6 +13,7 @@ dotenv.config();
 export const config = {
   port: parseInt(process.env.PORT || "3000", 10),
   nodeEnv: process.env.NODE_ENV || "development",
+  appUrl: process.env.APP_URL || "http://localhost:5173",
   cors: {
     origin: process.env.CORS_ORIGIN || "*",
   },

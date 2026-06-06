@@ -451,6 +451,7 @@ function buildSummary(
     }),
     recurrence,
     recurrenceParentId: m.recurrenceParentId?.toString(),
+    pinned: (m.pinnedBy ?? []).some((u) => u.toString() === viewerId),
     createdAt: m.createdAt.toISOString(),
     updatedAt: m.updatedAt.toISOString(),
   };

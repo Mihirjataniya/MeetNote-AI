@@ -1,18 +1,93 @@
-import { useEffect } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { NavLink, useNavigate, useLocation } from "react-router-dom";
 import { useAuthStore } from "../../stores/useAuthStore";
 import { useUIStore } from "../../stores/useUIStore";
+import { usePinnedMeetings } from "../../queries/useMeetingsQuery";
+import { useScheduledMeetings } from "../../queries/useSchedulesQuery";
+import { fetchMeetingNotes, type PinnedMeetingSummary } from "../../services/meetings";
 import { Icon } from "./Icon";
 import { Avatar } from "./Avatar";
 
-const navItems = [
-  { to: "/home", label: "Home", icon: "home" },
-  { to: "/schedules", label: "Schedules", icon: "calendar", count: "4" },
-  { to: "/history", label: "Meeting Histories", icon: "history" },
-  { to: "/settings", label: "Settings", icon: "settings" },
-];
+function PinnedItem({
+  meeting,
+  onNavigate,
+}: {
+  meeting: PinnedMeetingSummary;
+  onNavigate: (to: string) => void;
+}) {
+  const [busy, setBusy] = useState(false);
 
-const pinnedItems = ["Q3 Roadmap", "Customer interviews", "Weekly 1:1 — Sara"];
+  const isScheduled = meeting.status === "scheduled";
+  const isActive = meeting.status === "active";
+  const hasNotes = meeting.notesStatus === "completed";
+
+  // Decide the right action — scheduled → schedules page, live → jump in,
+  // notes ready → download, otherwise → history.
+  let actionLabel: string;
+  let actionIcon: string;
+  if (isActive) {
+    actionLabel = "Join live meeting";
+    actionIcon = "video";
+  } else if (isScheduled) {
+    actionLabel = "Go to scheduled meeting";
+    actionIcon = "calendar";
+  } else if (hasNotes) {
+    actionLabel = busy ? "Preparing PDF…" : "Download notes";
+    actionIcon = busy ? "spinner" : "sparkle";
+  } else {
+    actionLabel = "Open meeting history";
+    actionIcon = "history";
+  }
+
+  async function handleClick() {
+    if (busy) return;
+    if (isActive) {
+      const hostQuery = meeting.isHost ? "&host=1" : "";
+      onNavigate(`/room/${meeting.roomId}?scheduledMeetingId=${meeting.id}${hostQuery}`);
+      return;
+    }
+    if (isScheduled) {
+      onNavigate("/schedules");
+      return;
+    }
+    if (hasNotes) {
+      setBusy(true);
+      try {
+        const md = await fetchMeetingNotes(meeting.id);
+        const { downloadNotesPdf } = await import("../../utils/notesPdf");
+        await downloadNotesPdf(md, meeting.title);
+      } catch (err) {
+        console.error("Notes download failed:", err);
+      } finally {
+        setBusy(false);
+      }
+      return;
+    }
+    onNavigate("/history");
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={handleClick}
+      disabled={busy}
+      title={`${meeting.title || "Untitled meeting"} — ${actionLabel}`}
+      className="flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-[13.5px] font-medium text-secondary hover:bg-hover hover:text-foreground transition-all duration-[120ms] disabled:opacity-60 disabled:cursor-not-allowed text-left w-full"
+    >
+      <Icon
+        name={actionIcon}
+        size={13}
+        className={busy ? "animate-spin" : undefined}
+      />
+      <span className="overflow-hidden text-ellipsis whitespace-nowrap flex-1">
+        {meeting.title || "Untitled meeting"}
+      </span>
+      {isActive && (
+        <span className="w-1.5 h-1.5 rounded-full bg-[#dc2626] shadow-[0_0_0_3px_rgba(220,38,38,0.15)] shrink-0" />
+      )}
+    </button>
+  );
+}
 
 function SidebarContent() {
   const user = useAuthStore((s) => s.user);
@@ -24,6 +99,27 @@ function SidebarContent() {
   const setMobileOpen = useUIStore((s) => s.setMobileSidebarOpen);
 
   const closeMobile = () => setMobileOpen(false);
+
+  const { data: pinned = [] } = usePinnedMeetings(8);
+
+  // Live count of upcoming meetings in the next 7 days (non-cancelled, non-ended).
+  // useMemo so the from/to don't shift every render and cause query thrash.
+  const scheduleRange = useMemo(() => {
+    const now = new Date();
+    const to = new Date(now.getTime() + 7 * 86_400_000);
+    return { from: now.toISOString(), to: to.toISOString(), limit: 100 };
+  }, []);
+  const { data: schedulesData } = useScheduledMeetings(scheduleRange);
+  const upcomingCount = (schedulesData?.items ?? []).filter(
+    (s) => s.effectiveStatus !== "cancelled" && s.effectiveStatus !== "ended"
+  ).length;
+
+  const navItems: Array<{ to: string; label: string; icon: string; count?: number }> = [
+    { to: "/home", label: "Home", icon: "home" },
+    { to: "/schedules", label: "Schedules", icon: "calendar", count: upcomingCount },
+    { to: "/history", label: "Meeting Histories", icon: "history" },
+    { to: "/settings", label: "Settings", icon: "settings" },
+  ];
 
   return (
     <aside className="bg-background border-r border-border flex flex-col py-[18px] px-[14px] h-full overflow-y-auto overflow-x-hidden">
@@ -104,7 +200,7 @@ function SidebarContent() {
             {!collapsed && (
               <>
                 <span>{item.label}</span>
-                {"count" in item && item.count && (
+                {typeof item.count === "number" && item.count > 0 && (
                   <span className="ml-auto text-[11px] text-tertiary tabular-nums">
                     {item.count}
                   </span>
@@ -121,16 +217,22 @@ function SidebarContent() {
           <div className="text-[11px] font-medium uppercase tracking-[0.12em] text-tertiary px-2.5 pt-[18px] pb-1.5">
             Pinned
           </div>
-          {pinnedItems.map((title) => (
-            <div
-              key={title}
-              onClick={closeMobile}
-              className="flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-[13.5px] font-medium text-secondary hover:bg-hover hover:text-foreground transition-all duration-[120ms] cursor-pointer"
-            >
-              <Icon name="fileText" size={14} />
-              <span className="overflow-hidden text-ellipsis whitespace-nowrap">{title}</span>
+          {pinned.length === 0 ? (
+            <div className="px-2.5 py-2 text-[12px] text-tertiary leading-relaxed">
+              Pin a meeting or schedule to quick-access it here.
             </div>
-          ))}
+          ) : (
+            pinned.map((m) => (
+              <PinnedItem
+                key={m.id}
+                meeting={m}
+                onNavigate={(to) => {
+                  navigate(to);
+                  closeMobile();
+                }}
+              />
+            ))
+          )}
         </nav>
       )}
 

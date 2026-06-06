@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { Icon } from "../shell/Icon";
 import { AvatarGroup } from "../shell/Avatar";
 import { downloadScheduleIcs, type ScheduledMeetingSummary } from "../../services/schedules";
+import { useTogglePinMeeting } from "../../queries/useMeetingsQuery";
 
 interface Props {
   meeting: ScheduledMeetingSummary;
@@ -46,6 +47,7 @@ function formatRelative(iso: string): string {
 export function ScheduledMeetingCard({ meeting, onEdit, onCancel }: Props) {
   const navigate = useNavigate();
   const [downloading, setDownloading] = useState(false);
+  const togglePin = useTogglePinMeeting();
   const pill = STATUS_PILL[meeting.effectiveStatus] ?? STATUS_PILL.scheduled;
   const canJoin = meeting.effectiveStatus === "ready" || meeting.effectiveStatus === "active";
   const showHostActions = meeting.isHost && meeting.status === "scheduled";
@@ -116,6 +118,20 @@ export function ScheduledMeetingCard({ meeting, onEdit, onCancel }: Props) {
         </div>
       </div>
       <div className="flex items-center gap-2 flex-wrap">
+        <button
+          onClick={() =>
+            togglePin.mutate({ meetingId: meeting.id, pinned: !meeting.pinned })
+          }
+          disabled={togglePin.isPending}
+          title={meeting.pinned ? "Unpin from sidebar" : "Pin to sidebar"}
+          className={`shrink-0 h-8 w-8 rounded-lg border flex items-center justify-center transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
+            meeting.pinned
+              ? "border-accent text-accent bg-accent/10 hover:bg-accent/15"
+              : "border-border text-secondary hover:bg-surface-hover hover:text-foreground"
+          }`}
+        >
+          <Icon name="pin" size={14} />
+        </button>
         <button
           onClick={handleIcs}
           disabled={downloading}

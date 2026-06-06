@@ -2,6 +2,7 @@
 import { useState } from "react";
 import { Icon } from "./shell/Icon";
 import { fetchMeetingNotes, type MeetingSummary } from "../services/meetings";
+import { useTogglePinMeeting } from "../queries/useMeetingsQuery";
 
 export function formatDuration(ms?: number): string {
   if (!ms) return "";
@@ -55,6 +56,7 @@ async function downloadNotes(meetingId: string, title?: string) {
 
 export function MeetingRow({ m }: { m: MeetingSummary }) {
   const [downloadingNotes, setDownloadingNotes] = useState(false);
+  const togglePin = useTogglePinMeeting();
 
   const handleNotesDownload = async (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -67,6 +69,12 @@ export function MeetingRow({ m }: { m: MeetingSummary }) {
     } finally {
       setDownloadingNotes(false);
     }
+  };
+
+  const handleTogglePin = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (togglePin.isPending) return;
+    togglePin.mutate({ meetingId: m.id, pinned: !m.pinned });
   };
 
   return (
@@ -90,6 +98,18 @@ export function MeetingRow({ m }: { m: MeetingSummary }) {
         </div>
       </div>
       <div className="flex items-center gap-2">
+        <button
+          onClick={handleTogglePin}
+          disabled={togglePin.isPending}
+          title={m.pinned ? "Unpin from sidebar" : "Pin to sidebar"}
+          className={`shrink-0 h-8 w-8 rounded-lg border flex items-center justify-center transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
+            m.pinned
+              ? "border-accent text-accent bg-accent/10 hover:bg-accent/15"
+              : "border-border text-secondary hover:bg-surface-hover hover:text-foreground"
+          }`}
+        >
+          <Icon name="pin" size={14} />
+        </button>
         {m.notesStatus === "completed" && (
           <button
             onClick={handleNotesDownload}

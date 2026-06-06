@@ -54,6 +54,7 @@ router.get("/", requireAuth, async (req, res) => {
       const id = m._id.toString();
       const transcript = transcriptMap.get(id);
       const recording = recordingMap.get(id);
+      const pinned = (m.pinnedBy ?? []).some((u) => u.toString() === userId);
       return {
         id,
         title: m.title,
@@ -65,6 +66,7 @@ router.get("/", requireAuth, async (req, res) => {
         transcriptStatus: transcript?.status ?? null,
         notesStatus: transcript?.notesStatus ?? null,
         recordingStatus: recording?.status ?? null,
+        pinned,
       };
     });
 
@@ -159,6 +161,86 @@ router.get("/stats", requireAuth, async (req, res) => {
   }
 });
 
+router.get("/pinned", requireAuth, async (req, res) => {
+  try {
+    const userId = new Types.ObjectId(req.user!.userId);
+    const limit = Math.min(
+      Math.max(parseInt(qp(req.query.limit) ?? "10") || 10, 1),
+      50
+    );
+
+    const meetings = await Meeting.find({ pinnedBy: userId })
+      .sort({ updatedAt: -1 })
+      .limit(limit)
+      .select(
+        "title status startedAt endedAt durationMs participants roomId scheduledStartTime scheduledDurationMin createdBy"
+      )
+      .lean();
+
+    const ids = meetings.map((m) => m._id);
+    const transcripts = await Transcript.find({ meetingId: { $in: ids } })
+      .select("meetingId notesStatus")
+      .lean();
+    const notesMap = new Map(
+      transcripts.map((t) => [t.meetingId.toString(), t.notesStatus ?? null])
+    );
+
+    const viewerId = req.user!.userId;
+    res.json({
+      meetings: meetings.map((m) => ({
+        id: m._id.toString(),
+        title: m.title,
+        status: m.status,
+        roomId: m.roomId,
+        startedAt: m.startedAt,
+        endedAt: m.endedAt,
+        scheduledStartTime: m.scheduledStartTime,
+        scheduledDurationMin: m.scheduledDurationMin,
+        durationMs: m.durationMs,
+        participantCount: m.participants.length,
+        notesStatus: notesMap.get(m._id.toString()) ?? null,
+        isHost: m.createdBy.toString() === viewerId,
+      })),
+    });
+  } catch (err) {
+    console.error("Failed to fetch pinned meetings:", err);
+    res.status(500).json({ message: "Failed to fetch pinned meetings" });
+  }
+});
+
+router.patch("/:id/pin", requireAuth, async (req, res) => {
+  try {
+    const userId = new Types.ObjectId(req.user!.userId);
+    const idParam = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+    if (!Types.ObjectId.isValid(idParam)) {
+      res.status(400).json({ message: "Invalid meeting id" });
+      return;
+    }
+    const pinned = req.body?.pinned === true;
+
+    const meeting = await Meeting.findOne({
+      _id: idParam,
+      "participants.userId": userId,
+    }).select("_id");
+    if (!meeting) {
+      res.status(404).json({ message: "Meeting not found" });
+      return;
+    }
+
+    await Meeting.updateOne(
+      { _id: idParam },
+      pinned
+        ? { $addToSet: { pinnedBy: userId } }
+        : { $pull: { pinnedBy: userId } }
+    );
+
+    res.json({ id: idParam, pinned });
+  } catch (err) {
+    console.error("Failed to toggle pin:", err);
+    res.status(500).json({ message: "Failed to toggle pin" });
+  }
+});
+
 router.get("/:id", requireAuth, async (req, res) => {
   try {
     const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
@@ -195,6 +277,9 @@ router.get("/:id", requireAuth, async (req, res) => {
       notesStatus: transcript?.notesStatus ?? null,
       recordingStatus: recording?.status ?? null,
       cloudinaryUrls: recording?.cloudinaryUrls ?? [],
+      pinned: (meeting.pinnedBy ?? []).some(
+        (u) => u.toString() === req.user!.userId
+      ),
     });
   } catch (err) {
     console.error("Failed to fetch meeting:", err);

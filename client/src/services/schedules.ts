@@ -49,6 +49,7 @@ export interface ScheduledMeetingSummary {
   invitedUsers: Array<{ id: string; displayName: string; email: string }>;
   recurrence?: RecurrenceDTO;
   recurrenceParentId?: string;
+  pinned: boolean;
   createdAt: string;
   updatedAt: string;
 }

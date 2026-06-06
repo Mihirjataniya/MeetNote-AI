@@ -5,7 +5,10 @@ import { meetingService } from "../services/meetingService";
 import { recordingService } from "../services/recordingService";
 import { pipelineService } from "../services/pipelineService";
 import { scheduleService, ScheduleError } from "../services/scheduleService";
-import { notifyMeetingStateChanged } from "../services/notificationService";
+import {
+  notifyMeetingStateChanged,
+  notifyHostJoinRequestMissed,
+} from "../services/notificationService";
 import { Meeting } from "../models/Meeting";
 import { Recording } from "../models/Recording";
 import type {
@@ -399,6 +402,16 @@ export function registerRoomHandlers(io: TypedServer): void {
         if (!hostPresent) {
           roomService.addWaitingSocket(payload.roomId, socket.id);
           callback({ roomId: payload.roomId, state: "waiting-for-host" });
+          if (room.hostUserId) {
+            notifyHostJoinRequestMissed(
+              room.hostUserId,
+              payload.roomId,
+              displayName,
+              room.meetingId ?? undefined
+            ).catch((e) =>
+              console.error("[Notify] missed-lobby failed:", e)
+            );
+          }
           return;
         }
 

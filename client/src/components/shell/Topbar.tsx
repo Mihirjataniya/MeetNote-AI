@@ -3,6 +3,7 @@ import { useAuthStore } from "../../stores/useAuthStore";
 import { useUIStore } from "../../stores/useUIStore";
 import { Icon } from "./Icon";
 import { Avatar } from "./Avatar";
+import { NotificationBell } from "./NotificationBell";
 
 const pageLabels: Record<string, string> = {
   "/home": "Home",
@@ -60,13 +61,7 @@ export function Topbar() {
         <Icon name="search" size={16} />
       </button>
 
-      <button
-        className="relative w-[34px] h-[34px] rounded-[10px] inline-flex items-center justify-center hover:bg-hover transition-colors duration-150"
-        title="Notifications"
-      >
-        <Icon name="bell" size={16} />
-        <span className="absolute top-1.5 right-1.5 w-[7px] h-[7px] rounded-full bg-foreground shadow-[0_0_0_2px_var(--background)]" />
-      </button>
+      <NotificationBell />
 
       <button
         onClick={() => navigate("/profile")}

@@ -5,6 +5,7 @@ import type {
   MediaKind,
 } from "mediasoup/types";
 import type { ParticipantInfo, PendingRequestInfo } from "./room.types";
+import type { NotificationPayload } from "./notification.types";
 
 // --- Room event payloads ---
 
@@ -317,6 +318,7 @@ export interface ServerToClientEvents {
   "join-request-cancelled": (payload: JoinRequestCancelledPayload) => void;
   "join-approved": (payload: JoinApprovedPayload) => void;
   "join-denied": (payload: JoinDeniedPayload) => void;
+  "notification:new": (payload: NotificationPayload) => void;
 }
 
 export interface InterServerEvents {}

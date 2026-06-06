@@ -4,3 +4,4 @@ export * from "./socket.types";
 export * from "./meeting.types";
 export * from "./recording.types";
 export * from "./transcript.types";
+export * from "./notification.types";

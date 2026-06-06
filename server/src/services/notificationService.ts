@@ -1,29 +1,106 @@
+import { Types } from "mongoose";
 import { getIO } from "../socket/index";
 import { Meeting } from "../models/Meeting";
-import type { MeetingStateChangeKind } from "../types/index";
+import { Notification, type INotification } from "../models/Notification";
+import { sendPushToUser } from "./pushService";
+import type { MeetingStateChangeKind, NotificationType, NotificationPayload } from "../types/index";
+
+function toPayload(n: INotification): NotificationPayload {
+  return {
+    id: n._id.toString(),
+    type: n.type,
+    title: n.title,
+    body: n.body,
+    meetingId: n.meetingId?.toString(),
+    roomId: n.roomId,
+    requesterName: n.requesterName,
+    readAt: n.readAt ? n.readAt.toISOString() : null,
+    createdAt: n.createdAt.toISOString(),
+  };
+}
+
+interface CreateOpts {
+  userId: string | Types.ObjectId;
+  type: NotificationType;
+  title: string;
+  body?: string;
+  meetingId?: string | Types.ObjectId;
+  roomId?: string;
+  requesterName?: string;
+}
+
+export async function createNotification(opts: CreateOpts): Promise<NotificationPayload | null> {
+  try {
+    const doc = await Notification.create({
+      userId: opts.userId,
+      type: opts.type,
+      title: opts.title,
+      body: opts.body,
+      meetingId: opts.meetingId,
+      roomId: opts.roomId,
+      requesterName: opts.requesterName,
+    });
+    const payload = toPayload(doc);
+    try {
+      const io = getIO();
+      io.to(`user:${opts.userId.toString()}`).emit("notification:new", payload);
+    } catch (err) {
+      console.error("[Notify] socket emit failed:", err);
+    }
+    sendPushToUser(opts.userId.toString(), payload).catch((err) =>
+      console.error("[Notify] web-push failed:", err)
+    );
+    return payload;
+  } catch (err) {
+    console.error("[Notify] create failed:", err);
+    return null;
+  }
+}
+
+async function createBulk(
+  userIds: Array<string | Types.ObjectId>,
+  shared: Omit<CreateOpts, "userId">
+): Promise<void> {
+  await Promise.all(
+    userIds.map((userId) => createNotification({ ...shared, userId }))
+  );
+}
 
 export async function notifyTranscriptStatus(
   meetingId: string,
   status: "completed" | "failed"
 ): Promise<void> {
   try {
-    const io = getIO();
     const meeting = await Meeting.findById(meetingId)
-      .select("participants.userId")
+      .select("title participants.userId")
       .lean();
     if (!meeting) return;
 
+    const title = meeting.title ?? "Untitled meeting";
+    const isOk = status === "completed";
+
+    // Live cache-update event (existing)
+    const io = getIO();
     for (const p of meeting.participants) {
       io.to(`user:${p.userId.toString()}`).emit("transcript-ready", {
         meetingId,
         status,
       });
     }
-    console.log(
-      `[Notify] transcript-ready (${status}) → ${meeting.participants.length} participant(s) for meeting ${meetingId}`
+
+    await createBulk(
+      meeting.participants.map((p) => p.userId),
+      {
+        type: isOk ? "transcript-ready" : "transcript-failed",
+        title: isOk ? "Transcript ready" : "Transcript failed",
+        body: isOk
+          ? `Transcript for "${title}" is ready.`
+          : `We couldn't transcribe "${title}". You can still listen to the recording.`,
+        meetingId,
+      }
     );
   } catch (err) {
-    console.error("[Notify] Failed to send transcript-ready:", err);
+    console.error("[Notify] transcript status failed:", err);
   }
 }
 
@@ -32,25 +109,53 @@ export async function notifyNotesStatus(
   status: "completed" | "failed"
 ): Promise<void> {
   try {
-    const io = getIO();
     const meeting = await Meeting.findById(meetingId)
-      .select("participants.userId")
+      .select("title participants.userId")
       .lean();
     if (!meeting) return;
 
+    const title = meeting.title ?? "Untitled meeting";
+    const isOk = status === "completed";
+
+    const io = getIO();
     for (const p of meeting.participants) {
       io.to(`user:${p.userId.toString()}`).emit("notes-ready", {
         meetingId,
         status,
       });
     }
-    console.log(
-      `[Notify] notes-ready (${status}) → ${meeting.participants.length} participant(s) for meeting ${meetingId}`
+
+    await createBulk(
+      meeting.participants.map((p) => p.userId),
+      {
+        type: isOk ? "notes-ready" : "notes-failed",
+        title: isOk ? "Meeting notes ready" : "Notes generation failed",
+        body: isOk
+          ? `AI-generated notes for "${title}" are ready to read.`
+          : `We couldn't generate notes for "${title}".`,
+        meetingId,
+      }
     );
   } catch (err) {
-    console.error("[Notify] Failed to send notes-ready:", err);
+    console.error("[Notify] notes status failed:", err);
   }
 }
+
+const STATE_TITLES: Record<MeetingStateChangeKind, string> = {
+  created: "New meeting invitation",
+  updated: "Meeting updated",
+  cancelled: "Meeting cancelled",
+  "series-cancelled": "Recurring meeting cancelled",
+  started: "Meeting started",
+};
+
+const STATE_TYPES: Record<MeetingStateChangeKind, NotificationType> = {
+  created: "meeting-invited",
+  updated: "meeting-updated",
+  cancelled: "meeting-cancelled",
+  "series-cancelled": "meeting-series-cancelled",
+  started: "meeting-started",
+};
 
 export async function notifyMeetingStateChanged(
   meetingIds: string[],
@@ -60,19 +165,49 @@ export async function notifyMeetingStateChanged(
   try {
     const io = getIO();
     const meetings = await Meeting.find({ _id: { $in: meetingIds } })
-      .select("createdBy invitedUserIds")
+      .select("createdBy invitedUserIds title roomId")
       .lean();
+
     for (const m of meetings) {
-      const audience = new Set<string>([m.createdBy.toString()]);
+      // Audience: invitees + host. For `started`, skip the host since they're already in.
+      const audience = new Set<string>();
       for (const id of m.invitedUserIds ?? []) audience.add(id.toString());
+      if (kind !== "started") audience.add(m.createdBy.toString());
+
       for (const userId of audience) {
         io.to(`user:${userId}`).emit("meeting-state-changed", {
           meetingId: m._id.toString(),
           kind,
         });
       }
+
+      const title = m.title ?? "Untitled meeting";
+      await createBulk(Array.from(audience), {
+        type: STATE_TYPES[kind],
+        title: STATE_TITLES[kind],
+        body: `"${title}"`,
+        meetingId: m._id.toString(),
+        roomId: m.roomId,
+      });
     }
   } catch (err) {
     console.error("[Notify] meeting-state-changed failed:", err);
   }
+}
+
+export async function notifyHostJoinRequestMissed(
+  hostUserId: string,
+  roomId: string,
+  requesterName: string,
+  meetingId?: string
+): Promise<void> {
+  await createNotification({
+    userId: hostUserId,
+    type: "join-request-missed",
+    title: "Someone tried to join",
+    body: `${requesterName} is waiting to join your meeting.`,
+    roomId,
+    requesterName,
+    meetingId,
+  });
 }

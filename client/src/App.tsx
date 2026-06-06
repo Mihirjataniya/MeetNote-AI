@@ -6,6 +6,7 @@ import { useAuthStore } from "./stores/useAuthStore";
 import "./stores/useSocketStore";
 import { AuthPage } from "./components/AuthPage";
 import { AppShell } from "./components/shell/AppShell";
+import { Toaster } from "./components/shell/Toaster";
 import { HomePage } from "./pages/HomePage";
 import { SchedulesPage } from "./pages/SchedulesPage";
 import { HistoryPage } from "./pages/HistoryPage";
@@ -60,6 +61,7 @@ function App() {
     <QueryClientProvider client={queryClient}>
       <BrowserRouter>
         <AppRoutes />
+        <Toaster />
       </BrowserRouter>
     </QueryClientProvider>
   );

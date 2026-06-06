@@ -317,6 +317,19 @@ export interface ServerToClientEvents {
   "join-request-cancelled": (payload: JoinRequestCancelledPayload) => void;
   "join-approved": (payload: JoinApprovedPayload) => void;
   "join-denied": (payload: JoinDeniedPayload) => void;
+  "notification:new": (payload: NotificationSocketPayload) => void;
+}
+
+export interface NotificationSocketPayload {
+  id: string;
+  type: string;
+  title: string;
+  body?: string;
+  meetingId?: string;
+  roomId?: string;
+  requesterName?: string;
+  readAt: string | null;
+  createdAt: string;
 }
 
 export function isError(response: unknown): response is ErrorPayload {

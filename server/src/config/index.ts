@@ -39,6 +39,11 @@ export const config = {
     apiKey: process.env.GEMINI_API_KEY || "",
     model: process.env.GEMINI_MODEL || "gemini-flash-latest",
   },
+  webPush: {
+    publicKey: process.env.VAPID_PUBLIC_KEY || "",
+    privateKey: process.env.VAPID_PRIVATE_KEY || "",
+    subject: process.env.VAPID_SUBJECT || "mailto:noreply@meetnote.local",
+  },
   mediasoup: {
     worker: {
       logLevel: "warn" as WorkerLogLevel,

@@ -5,6 +5,7 @@ import recordingRoutes from "./recordings";
 import chatRoutes from "./chat";
 import schedulesRoutes from "./schedules";
 import usersRoutes from "./users";
+import notificationsRoutes from "./notifications";
 
 const router = Router();
 
@@ -18,5 +19,6 @@ router.use("/recordings", recordingRoutes);
 router.use("/chat", chatRoutes);
 router.use("/schedules", schedulesRoutes);
 router.use("/users", usersRoutes);
+router.use("/notifications", notificationsRoutes);
 
 export default router;

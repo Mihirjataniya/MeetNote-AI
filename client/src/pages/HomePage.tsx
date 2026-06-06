@@ -1,53 +1,72 @@
+import { useNavigate } from "react-router-dom";
 import { useAuthStore } from "../stores/useAuthStore";
 import { useUIStore } from "../stores/useUIStore";
 import { Icon } from "../components/shell/Icon";
 import { AvatarGroup } from "../components/shell/Avatar";
 import { MeetingRow } from "../components/MeetingRow";
-import { useRecentMeetings } from "../queries/useMeetingsQuery";
+import { useRecentMeetings, useMeetingStats } from "../queries/useMeetingsQuery";
+import { useScheduledMeetings } from "../queries/useSchedulesQuery";
+import type { ScheduledMeetingSummary } from "../services/schedules";
 
-interface UpcomingMeeting {
-  id: string;
-  title: string;
-  date: string;
-  time: string;
-  dow: string;
-  day: string;
-  participants: string[];
-  status?: "live";
+const WEEKDAY_SHORT = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+
+function formatTimeRange(startIso: string, durationMin: number): string {
+  const start = new Date(startIso);
+  const end = new Date(start.getTime() + durationMin * 60_000);
+  const fmt = (d: Date) =>
+    d.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: false });
+  return `${fmt(start)} — ${fmt(end)}`;
 }
 
-const UPCOMING: UpcomingMeeting[] = [
-  { id: "u1", title: "Q3 Launch Readiness", date: "Today", time: "11:00 — 11:45", dow: "Tue", day: "14", participants: ["Sara Kim", "Diego Ortiz", "Mei Tanaka", "Alex Reyes"], status: "live" },
-  { id: "u2", title: "Weekly 1:1 — Sara", date: "Today", time: "14:00 — 14:30", dow: "Tue", day: "14", participants: ["Sara Kim", "Alex Reyes"] },
-  { id: "u3", title: "Customer Discovery — Halcyon", date: "Tomorrow", time: "09:30 — 10:15", dow: "Wed", day: "15", participants: ["Priya Shah", "Diego Ortiz", "Alex Reyes"] },
-  { id: "u4", title: "Design Review · Notes editor", date: "Thu, May 16", time: "15:00 — 16:00", dow: "Thu", day: "16", participants: ["Mei Tanaka", "Diego Ortiz", "Alex Reyes"] },
-];
+function formatRelativeDate(iso: string): string {
+  const start = new Date(iso);
+  const now = new Date();
+  const startDay = new Date(start.getFullYear(), start.getMonth(), start.getDate());
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const diffDays = Math.round((startDay.getTime() - today.getTime()) / 86_400_000);
+  if (diffDays === 0) return "Today";
+  if (diffDays === 1) return "Tomorrow";
+  return start.toLocaleDateString("en-US", { weekday: "short", day: "numeric", month: "short" });
+}
 
-const STATS = [
-  { label: "Meetings this week", value: "12", sub: "+3 vs last" },
-  { label: "Hours captured", value: "8.4", sub: "−1.1 vs last" },
-  { label: "Action items", value: "38", sub: "24 open" },
-  { label: "Notes generated", value: "11", sub: "92% success" },
-];
+function liveLabel(startIso: string, durationMin: number): string | null {
+  const start = new Date(startIso).getTime();
+  const end = start + durationMin * 60_000;
+  const now = Date.now();
+  if (now >= start && now <= end) return "Live now";
+  const minsUntil = Math.round((start - now) / 60_000);
+  if (minsUntil > 0 && minsUntil <= 15) return `Live in ${minsUntil}m`;
+  return null;
+}
 
-function UpcomingCard({ m }: { m: UpcomingMeeting }) {
+function UpcomingCard({ m }: { m: ScheduledMeetingSummary }) {
+  const navigate = useNavigate();
+  const start = new Date(m.scheduledStartTime);
+  const dow = WEEKDAY_SHORT[start.getDay()];
+  const day = String(start.getDate());
+  const participantNames = m.invitedUsers.map((u) => u.displayName).concat(m.hostName);
+  const status = liveLabel(m.scheduledStartTime, m.scheduledDurationMin);
+  const canJoin = Date.now() >= start.getTime() - 5 * 60_000;
+
   return (
     <div className="bg-surface border border-border rounded-[14px] shadow-sm p-4 sm:p-5 flex flex-col gap-3 sm:gap-4 transition-shadow duration-150 hover:shadow-md min-h-[180px] sm:min-h-[200px]">
       <div className="flex items-start gap-3">
         <div className="w-12 sm:w-14 py-2 sm:py-2.5 rounded-[10px] bg-surface-hover border border-border flex flex-col items-center shrink-0">
-          <div className="text-[10px] sm:text-[10.5px] tracking-[0.06em] text-tertiary uppercase font-medium">{m.dow}</div>
-          <div className="text-[20px] sm:text-[22px] font-semibold text-foreground tabular-nums">{m.day}</div>
+          <div className="text-[10px] sm:text-[10.5px] tracking-[0.06em] text-tertiary uppercase font-medium">{dow}</div>
+          <div className="text-[20px] sm:text-[22px] font-semibold text-foreground tabular-nums">{day}</div>
         </div>
         <div className="flex-1 min-w-0">
           <div className="text-[13.5px] sm:text-[14.5px] font-semibold text-foreground overflow-hidden text-ellipsis whitespace-nowrap">
             {m.title}
           </div>
-          <div className="text-[11.5px] sm:text-[12px] text-secondary mt-1">{m.date} · {m.time}</div>
+          <div className="text-[11.5px] sm:text-[12px] text-secondary mt-1">
+            {formatRelativeDate(m.scheduledStartTime)} · {formatTimeRange(m.scheduledStartTime, m.scheduledDurationMin)}
+          </div>
         </div>
-        {m.status === "live" && (
+        {status && (
           <span className="inline-flex items-center gap-1.5 px-2 sm:px-2.5 py-[3px] rounded-full bg-surface-hover border border-border text-[10px] sm:text-[11px] font-medium text-secondary whitespace-nowrap">
             <span className="w-1.5 h-1.5 rounded-full bg-success shadow-[0_0_0_3px_rgba(22,163,74,0.15)]" />
-            <span className="hidden xs:inline">Live in </span>12m
+            {status}
           </span>
         )}
       </div>
@@ -56,10 +75,16 @@ function UpcomingCard({ m }: { m: UpcomingMeeting }) {
 
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <AvatarGroup names={m.participants} size={22} max={3} />
-          <span className="text-[11px] sm:text-[11.5px] text-tertiary">{m.participants.length} guests</span>
+          <AvatarGroup names={participantNames} size={22} max={3} />
+          <span className="text-[11px] sm:text-[11.5px] text-tertiary">
+            {participantNames.length} guest{participantNames.length === 1 ? "" : "s"}
+          </span>
         </div>
-        <button className="h-[30px] px-[11px] rounded-lg bg-accent text-accent-foreground font-medium text-[13px] inline-flex items-center gap-1.5 border border-accent hover:bg-accent/80 transition-all duration-150 active:scale-[0.98]">
+        <button
+          onClick={() => navigate(`/room/${m.roomId}?scheduledMeetingId=${m.id}${m.isHost ? "&host=1" : ""}`)}
+          disabled={!canJoin}
+          className="h-[30px] px-[11px] rounded-lg bg-accent text-accent-foreground font-medium text-[13px] inline-flex items-center gap-1.5 border border-accent hover:bg-accent/80 transition-all duration-150 active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed"
+        >
           <Icon name="video" size={12} /> Join
         </button>
       </div>
@@ -69,12 +94,51 @@ function UpcomingCard({ m }: { m: UpcomingMeeting }) {
 
 
 export function HomePage() {
+  const navigate = useNavigate();
   const user = useAuthStore((s) => s.user);
   const openStartMeeting = useUIStore((s) => s.openStartMeeting);
   const openScheduleMeeting = useUIStore((s) => s.openScheduleMeeting);
   const { data: recentMeetings = [], isLoading: loadingMeetings } = useRecentMeetings(5);
+  const { data: stats } = useMeetingStats();
 
   const now = new Date();
+  const sevenDaysOut = new Date(now.getTime() + 7 * 86_400_000);
+  const { data: schedules } = useScheduledMeetings({
+    from: now.toISOString(),
+    to: sevenDaysOut.toISOString(),
+    limit: 50,
+  });
+
+  const upcoming = (schedules?.items ?? [])
+    .filter((s) => s.effectiveStatus !== "cancelled" && s.effectiveStatus !== "ended")
+    .sort(
+      (a, b) =>
+        new Date(a.scheduledStartTime).getTime() - new Date(b.scheduledStartTime).getTime()
+    )
+    .slice(0, 4);
+
+  const todayCount = upcoming.filter((s) => {
+    const d = new Date(s.scheduledStartTime);
+    return d.toDateString() === now.toDateString();
+  }).length;
+
+  const nextUp = upcoming[0];
+  let nextLabel = "";
+  if (nextUp) {
+    const minsUntil = Math.round((new Date(nextUp.scheduledStartTime).getTime() - now.getTime()) / 60_000);
+    if (minsUntil <= 0) nextLabel = "One is live now.";
+    else if (minsUntil < 60) nextLabel = `The next starts in ${minsUntil} minute${minsUntil === 1 ? "" : "s"}.`;
+    else if (minsUntil < 24 * 60) {
+      const hrs = Math.round(minsUntil / 60);
+      nextLabel = `The next starts in ${hrs} hour${hrs === 1 ? "" : "s"}.`;
+    } else {
+      nextLabel = `The next is on ${formatRelativeDate(nextUp.scheduledStartTime)}.`;
+    }
+  }
+  const greetingSub = upcoming.length === 0
+    ? "Nothing scheduled in the next 7 days. Start one anytime."
+    : `You have ${todayCount} meeting${todayCount === 1 ? "" : "s"} today. ${nextLabel}`;
+
   const dateStr = now.toLocaleDateString("en-US", {
     weekday: "long",
     day: "numeric",
@@ -83,6 +147,42 @@ export function HomePage() {
   const hour = now.getHours();
   const greeting = hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";
   const firstName = user?.displayName?.split(" ")[0] ?? "there";
+
+  const fmtDelta = (n: number): string => {
+    if (n === 0) return "no change";
+    const sign = n > 0 ? "+" : "−";
+    return `${sign}${Math.abs(n)} vs last`;
+  };
+  const fmtHoursDelta = (n: number): string => {
+    if (n === 0) return "no change";
+    const sign = n > 0 ? "+" : "−";
+    return `${sign}${Math.abs(n).toFixed(1)} vs last`;
+  };
+
+  const statCards = [
+    {
+      label: "Meetings this week",
+      value: stats ? String(stats.meetingsThisWeek.value) : null,
+      sub: stats ? fmtDelta(stats.meetingsThisWeek.delta) : "",
+    },
+    {
+      label: "Hours captured",
+      value: stats ? stats.hoursThisWeek.value.toFixed(1) : null,
+      sub: stats ? fmtHoursDelta(stats.hoursThisWeek.delta) : "",
+    },
+    {
+      label: "Notes generated",
+      value: stats ? String(stats.notesGenerated.value) : null,
+      sub: stats && stats.notesGenerated.total > 0
+        ? `${Math.round((stats.notesGenerated.value / stats.notesGenerated.total) * 100)}% success`
+        : (stats ? "no transcripts yet" : ""),
+    },
+    {
+      label: "Avg meeting length",
+      value: stats ? `${stats.avgMeetingMin.value}` : null,
+      sub: stats ? "minutes" : "",
+    },
+  ];
 
   return (
     <div className="px-4 sm:px-6 md:px-8 py-5 sm:py-7 max-w-[1240px] mx-auto flex flex-col gap-6 sm:gap-8">
@@ -94,9 +194,7 @@ export function HomePage() {
         <h1 className="text-[22px] sm:text-[28px] font-semibold tracking-[-0.025em] font-display mt-1 text-foreground">
           {greeting}, {firstName}.
         </h1>
-        <p className="text-[13px] sm:text-[14px] text-secondary mt-1.5">
-          You have 3 meetings today. The first starts in 12 minutes.
-        </p>
+        <p className="text-[13px] sm:text-[14px] text-secondary mt-1.5">{greetingSub}</p>
       </div>
 
       {/* Start meeting hero */}
@@ -139,40 +237,40 @@ export function HomePage() {
                 <span className="w-[5px] h-[5px] rounded-full bg-white/40" /> Auto-record
               </span>
               <span className="flex items-center gap-1.5">
-                <span className="w-[5px] h-[5px] rounded-full bg-white/40" /> Speaker labels
+                <span className="w-[5px] h-[5px] rounded-full bg-white/40" /> Timestamped transcript
               </span>
               <span className="flex items-center gap-1.5">
-                <span className="w-[5px] h-[5px] rounded-full bg-white/40" /> Notes in &lt;60s
+                <span className="w-[5px] h-[5px] rounded-full bg-white/40" /> AI notes via Gemini
               </span>
             </div>
           </div>
 
-          {/* Preview panel — hidden below lg */}
+          {/* Preview panel — decorative, mirrors real transcript shape */}
           <div className="w-[260px] self-stretch bg-white/[0.04] border border-white/[0.08] rounded-xl p-[18px] flex-col hidden lg:flex">
             <div className="flex items-center justify-between mb-3">
               <span className="text-[10px] tracking-[0.08em] uppercase px-[7px] py-[3px] rounded bg-white/[0.08] text-white/70">
-                Preview
+                Transcript
               </span>
-              <span className="text-[11px] text-white/50 font-mono">00:14:32</span>
+              <span className="text-[11px] text-white/50 font-mono">EN · nova-2</span>
             </div>
             <div className="flex flex-col gap-2 flex-1">
               {[
-                { who: "Sara Kim", txt: "Let's confirm the August 14 ship date — anything blocking?" },
-                { who: "Diego Ortiz", txt: "Two P0s remain. I'll have the playbook by Monday." },
-                { who: "Mei Tanaka", txt: "Marketing copy locks Friday, per Sara.", live: true },
+                { t: "00:00:08", txt: "Welcome back everyone — let's run through the ship checklist." },
+                { t: "00:00:21", txt: "Staging deploy is green. Logs look clean across all regions." },
+                { t: "00:00:34", txt: "We're shipping behind the flag tonight. Cut at 8 PM local.", live: true },
               ].map((m, i) => (
                 <div
                   key={i}
                   className={`px-2.5 py-2 rounded-lg ${m.live ? "bg-white/[0.06] border border-white/[0.08]" : "border border-transparent"}`}
                 >
-                  <div className="text-[10.5px] text-white/55 font-medium tracking-[0.02em]">{m.who}</div>
+                  <div className="text-[10.5px] text-white/55 font-mono tracking-[0.02em]">{m.t}</div>
                   <div className="text-[11.5px] text-white/85 mt-[3px] leading-[1.45]">{m.txt}</div>
                 </div>
               ))}
             </div>
             <div className="mt-3 px-2.5 py-2 rounded-lg bg-white/[0.04] flex items-center gap-2">
               <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
-              <span className="text-[11px] text-white/70">Listening...</span>
+              <span className="text-[11px] text-white/70">Capturing audio...</span>
               <span className="flex-1" />
               <Icon name="mic" size={12} className="text-white/50" />
             </div>
@@ -182,7 +280,7 @@ export function HomePage() {
 
       {/* Stats strip */}
       <div className="bg-surface border border-border rounded-[14px] shadow-sm grid grid-cols-2 md:grid-cols-4">
-        {STATS.map((s, i) => (
+        {statCards.map((s, i) => (
           <div
             key={i}
             className={`py-3.5 sm:py-[18px] px-4 sm:px-[22px] ${
@@ -194,11 +292,20 @@ export function HomePage() {
             <div className="text-[10px] sm:text-[11px] text-tertiary uppercase tracking-[0.08em] font-medium">
               {s.label}
             </div>
-            <div className="flex items-baseline gap-1.5 sm:gap-2 mt-1.5 sm:mt-2">
-              <div className="text-[22px] sm:text-[28px] font-semibold tracking-[-0.02em] tabular-nums text-foreground">
-                {s.value}
-              </div>
-              <div className="text-[10.5px] sm:text-[11.5px] text-tertiary">{s.sub}</div>
+            <div className="flex items-baseline gap-1.5 sm:gap-2 mt-1.5 sm:mt-2 min-h-[34px] sm:min-h-[40px]">
+              {s.value === null ? (
+                <div className="flex items-center gap-2 text-tertiary">
+                  <Icon name="lock" size={18} />
+                  <span className="text-[11px] sm:text-[12px]">Unlocking...</span>
+                </div>
+              ) : (
+                <>
+                  <div className="text-[22px] sm:text-[28px] font-semibold tracking-[-0.02em] tabular-nums text-foreground leading-none">
+                    {s.value}
+                  </div>
+                  <div className="text-[10.5px] sm:text-[11.5px] text-tertiary">{s.sub}</div>
+                </>
+              )}
             </div>
           </div>
         ))}
@@ -213,20 +320,24 @@ export function HomePage() {
             </h2>
             <div className="text-[12px] sm:text-[12.5px] text-tertiary mt-[3px]">Next 7 days</div>
           </div>
-          <div className="flex items-center gap-1.5">
-            <button className="h-[30px] px-[11px] rounded-lg text-[13px] font-medium text-foreground hover:bg-hover transition-colors hidden sm:inline-flex">
-              This week
-            </button>
-            <button className="h-[30px] px-[11px] rounded-lg text-[13px] font-medium text-foreground hover:bg-hover transition-colors inline-flex items-center gap-1">
-              All <Icon name="arrowRight" size={11} />
-            </button>
+          <button
+            onClick={() => navigate("/schedules")}
+            className="h-[30px] px-[11px] rounded-lg text-[13px] font-medium text-foreground hover:bg-hover transition-colors inline-flex items-center gap-1"
+          >
+            All <Icon name="arrowRight" size={11} />
+          </button>
+        </div>
+        {upcoming.length === 0 ? (
+          <div className="bg-surface border border-border rounded-[14px] shadow-sm px-5 py-8 text-center">
+            <div className="text-[14px] text-secondary">No upcoming meetings in the next 7 days.</div>
           </div>
-        </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-3.5">
-          {UPCOMING.map((m) => (
-            <UpcomingCard key={m.id} m={m} />
-          ))}
-        </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-3.5">
+            {upcoming.map((m) => (
+              <UpcomingCard key={m.id} m={m} />
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Recent meetings */}
@@ -238,7 +349,10 @@ export function HomePage() {
             </h2>
             <div className="text-[12px] sm:text-[12.5px] text-tertiary mt-[3px]">Notes ready to read</div>
           </div>
-          <button className="h-[30px] px-[11px] rounded-lg text-[13px] font-medium text-foreground hover:bg-hover transition-colors inline-flex items-center gap-1">
+          <button
+            onClick={() => navigate("/history")}
+            className="h-[30px] px-[11px] rounded-lg text-[13px] font-medium text-foreground hover:bg-hover transition-colors inline-flex items-center gap-1"
+          >
             View all <Icon name="arrowRight" size={11} />
           </button>
         </div>

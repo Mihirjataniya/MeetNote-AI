@@ -33,6 +33,7 @@ export interface IMeeting extends Document {
   startedAt?: Date;
   endedAt?: Date;
   durationMs?: number;
+  pinnedBy: Types.ObjectId[];
   createdAt: Date;
   updatedAt: Date;
 }
@@ -91,6 +92,7 @@ const meetingSchema = new Schema<IMeeting>(
     startedAt: { type: Date },
     endedAt: { type: Date },
     durationMs: { type: Number },
+    pinnedBy: [{ type: Schema.Types.ObjectId, ref: "User", default: [] }],
   },
   { timestamps: true }
 );
@@ -102,5 +104,6 @@ meetingSchema.index({ "participants.userId": 1 });
 meetingSchema.index({ invitedUserIds: 1, scheduledStartTime: 1 });
 meetingSchema.index({ createdBy: 1, scheduledStartTime: 1 });
 meetingSchema.index({ recurrenceParentId: 1 });
+meetingSchema.index({ pinnedBy: 1, updatedAt: -1 });
 
 export const Meeting = model<IMeeting>("Meeting", meetingSchema);

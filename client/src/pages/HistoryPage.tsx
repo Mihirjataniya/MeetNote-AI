@@ -44,12 +44,11 @@ export function HistoryPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [debouncedQuery, setDebouncedQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
-  const [transcriptFilter, setTranscriptFilter] = useState("");
   const [filtersVisible, setFiltersVisible] = useState(false);
 
-  const hasActiveFilters = !!(statusFilter || transcriptFilter);
+  const hasActiveFilters = !!statusFilter;
 
-  const prevFiltersRef = useRef({ q: "", status: "", transcript: "" });
+  const prevFiltersRef = useRef({ q: "", status: "" });
 
   useEffect(() => {
     const timer = setTimeout(() => setDebouncedQuery(searchQuery), 300);
@@ -58,26 +57,18 @@ export function HistoryPage() {
 
   useEffect(() => {
     const prev = prevFiltersRef.current;
-    const changed =
-      prev.q !== debouncedQuery ||
-      prev.status !== statusFilter ||
-      prev.transcript !== transcriptFilter;
+    const changed = prev.q !== debouncedQuery || prev.status !== statusFilter;
     if (changed && page !== 1) {
       setPage(1);
     }
-    prevFiltersRef.current = {
-      q: debouncedQuery,
-      status: statusFilter,
-      transcript: transcriptFilter,
-    };
-  }, [debouncedQuery, statusFilter, transcriptFilter, page]);
+    prevFiltersRef.current = { q: debouncedQuery, status: statusFilter };
+  }, [debouncedQuery, statusFilter, page]);
 
   const { data, isLoading: loading } = useMeetingsPage({
     page,
     limit: PAGE_SIZE,
     q: debouncedQuery || undefined,
     status: statusFilter || undefined,
-    transcriptStatus: transcriptFilter || undefined,
   });
 
   const meetings = data?.meetings ?? [];
@@ -87,7 +78,6 @@ export function HistoryPage() {
 
   const clearFilters = () => {
     setStatusFilter("");
-    setTranscriptFilter("");
   };
 
   return (
@@ -99,7 +89,7 @@ export function HistoryPage() {
             Meeting History
           </h1>
           <p className="text-[13px] sm:text-[14px] text-secondary mt-1.5">
-            Browse, search and download transcripts from past meetings.
+            Browse, search and download notes from past meetings.
           </p>
         </div>
         <button
@@ -144,17 +134,6 @@ export function HistoryPage() {
             <option value="active">Active</option>
             <option value="ended">Ended</option>
           </select>
-          <select
-            value={transcriptFilter}
-            onChange={(e) => setTranscriptFilter(e.target.value)}
-            className="h-8 px-3 rounded-lg border border-border-strong bg-surface text-[13px] text-foreground outline-none cursor-pointer hover:bg-surface-hover transition-colors"
-          >
-            <option value="">All transcripts</option>
-            <option value="completed">Completed</option>
-            <option value="processing">Processing</option>
-            <option value="failed">Failed</option>
-            <option value="none">No transcript</option>
-          </select>
           {hasActiveFilters && (
             <button
               onClick={clearFilters}
@@ -194,7 +173,7 @@ export function HistoryPage() {
             <p className="text-[13px] text-tertiary mt-2 max-w-[320px]">
               {hasActiveFilters || debouncedQuery
                 ? "Try adjusting your search or filters."
-                : "Meeting history with transcripts and download options will appear here."}
+                : "Meeting history with AI-generated notes and download options will appear here."}
             </p>
           </div>
         )}

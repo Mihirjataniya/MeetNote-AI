@@ -1,4 +1,4 @@
-import { useEffect, useRef, useCallback } from "react";
+import { useEffect, useRef, useCallback, useState } from "react";
 import { useParams, useNavigate, useSearchParams, useLocation, Link } from "react-router-dom";
 import { useRoomStore } from "../stores/useRoomStore";
 import { useSocketStore } from "../stores/useSocketStore";
@@ -15,7 +15,9 @@ function MeetingContent() {
   const location = useLocation();
   const [searchParams] = useSearchParams();
   const scheduledMeetingId = searchParams.get("scheduledMeetingId") ?? undefined;
-  const asHostQuery = searchParams.get("host") === "1";
+  const [asHostQuery, setAsHostQuery] = useState(
+    () => searchParams.get("host") === "1"
+  );
   const isNewRoom = urlRoomId === "new";
   const locationState = (location.state ?? {}) as {
     title?: string;
@@ -32,6 +34,8 @@ function MeetingContent() {
   const preferredCamOn = useRoomStore((s) => s.preferredCamOn);
   const createRoom = useRoomStore((s) => s.createRoom);
   const joinRoom = useRoomStore((s) => s.joinRoom);
+  const requestJoin = useRoomStore((s) => s.requestJoin);
+  const setError = useRoomStore((s) => s.setError);
   const clearMeetingId = useRoomStore((s) => s.clearMeetingId);
 
   const {
@@ -103,10 +107,22 @@ function MeetingContent() {
   // Redirect from /room/new to /room/:actualRoomId
   useEffect(() => {
     if (isNewRoom && roomId) {
-      const query = asHostQuery ? "?host=1" : "";
-      navigate(`/room/${roomId}${query}`, { replace: true });
+      navigate(`/room/${roomId}`, { replace: true });
     }
-  }, [isNewRoom, roomId, navigate, asHostQuery]);
+  }, [isNewRoom, roomId, navigate]);
+
+  // Strip ?host=1 from the URL bar once — it's only a UI hint.
+  // The asHostQuery state above already captured the initial value, so the
+  // lobby keeps showing the host UI without leaking the hint to a copied URL.
+  useEffect(() => {
+    if (searchParams.get("host") !== "1") return;
+    if (isNewRoom) return;
+    const next = new URLSearchParams(searchParams);
+    next.delete("host");
+    const qs = next.toString();
+    navigate(`/room/${urlRoomId}${qs ? `?${qs}` : ""}`, { replace: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Redirect home after leaving
   useEffect(() => {
@@ -136,6 +152,26 @@ function MeetingContent() {
       lobbyJoinTriggered.current = false;
     }
   }, [roomId, error]);
+
+  // Recover from a stale ?host=1 hint: if we optimistically tried to join as
+  // host but the server rejects with "Approval required", silently downgrade
+  // to the request-to-join flow instead of leaving the user stuck on an error.
+  useEffect(() => {
+    if (
+      asHostQuery &&
+      !isNewRoom &&
+      urlRoomId &&
+      error === "Approval required to join this meeting"
+    ) {
+      setAsHostQuery(false);
+      setError(null);
+      lobbyJoinTriggered.current = false;
+      requestJoin(
+        urlRoomId,
+        scheduledMeetingId ? { scheduledMeetingId } : undefined
+      );
+    }
+  }, [error, asHostQuery, isNewRoom, urlRoomId, scheduledMeetingId, requestJoin, setError]);
 
   const handleLeaveRoom = useCallback(async () => {
     if (flushIntervalRef.current) clearInterval(flushIntervalRef.current);

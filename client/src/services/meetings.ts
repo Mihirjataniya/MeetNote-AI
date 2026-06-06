@@ -25,7 +25,6 @@ export interface MeetingsPageParams {
   limit?: number;
   q?: string;
   status?: string;
-  transcriptStatus?: string;
 }
 
 export interface MeetingsPageResponse {
@@ -53,13 +52,27 @@ export async function fetchMeetingsPage(
   if (params.limit) sp.set("limit", String(params.limit));
   if (params.q) sp.set("q", params.q);
   if (params.status) sp.set("status", params.status);
-  if (params.transcriptStatus) sp.set("transcriptStatus", params.transcriptStatus);
 
   const res = await fetch(
     `${API_BASE}/api/meetings?${sp.toString()}`,
     { headers: authHeaders() }
   );
   if (!res.ok) throw new Error("Failed to fetch meetings");
+  return res.json();
+}
+
+export interface MeetingStats {
+  meetingsThisWeek: { value: number; delta: number };
+  hoursThisWeek: { value: number; delta: number };
+  notesGenerated: { value: number; total: number };
+  avgMeetingMin: { value: number };
+}
+
+export async function fetchMeetingStats(): Promise<MeetingStats> {
+  const res = await fetch(`${API_BASE}/api/meetings/stats`, {
+    headers: authHeaders(),
+  });
+  if (!res.ok) throw new Error("Failed to fetch meeting stats");
   return res.json();
 }
 
@@ -73,12 +86,3 @@ export async function fetchMeetingNotes(meetingId: string): Promise<string> {
   return body.meetingNotes ?? "";
 }
 
-export async function fetchTranscriptText(meetingId: string): Promise<string> {
-  const res = await fetch(
-    `${API_BASE}/api/meetings/${encodeURIComponent(meetingId)}/transcript`,
-    { headers: authHeaders() }
-  );
-  if (!res.ok) throw new Error("Failed to fetch transcript");
-  const body = await res.json();
-  return body.fullText ?? "";
-}

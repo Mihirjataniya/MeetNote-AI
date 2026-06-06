@@ -11,10 +11,6 @@ function qp(val: unknown): string | undefined {
   return typeof s === "string" && s ? s : undefined;
 }
 
-function escapeRegex(str: string): string {
-  return str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-}
-
 const router = Router();
 
 router.get("/", requireAuth, async (req, res) => {
@@ -26,75 +22,16 @@ router.get("/", requireAuth, async (req, res) => {
     );
     const q = qp(req.query.q);
     const status = qp(req.query.status);
-    const transcriptStatus = qp(req.query.transcriptStatus);
     const userId = req.user!.userId;
 
-    let meetingDocs: Array<{
-      _id: Types.ObjectId;
-      title?: string;
-      status: string;
-      participants: Array<{ userId: Types.ObjectId; displayName: string }>;
-      durationMs?: number;
-      startedAt?: Date;
-      endedAt?: Date;
-    }>;
-    let total: number;
-
-    if (transcriptStatus) {
-      const matchStage: Record<string, unknown> = {
-        "participants.userId": new Types.ObjectId(userId),
-      };
-      if (q) matchStage.title = { $regex: escapeRegex(q), $options: "i" };
-      if (status) matchStage.status = status;
-
-      const tsMatch =
-        transcriptStatus === "none"
-          ? { _transcriptStatus: "none" }
-          : { _transcriptStatus: transcriptStatus };
-
-      const pipeline = [
-        { $match: matchStage },
-        {
-          $lookup: {
-            from: "transcripts",
-            localField: "_id",
-            foreignField: "meetingId",
-            as: "_transcript",
-          },
-        },
-        {
-          $addFields: {
-            _transcriptStatus: {
-              $ifNull: [{ $arrayElemAt: ["$_transcript.status", 0] }, "none"],
-            },
-          },
-        },
-        { $match: tsMatch },
-        {
-          $facet: {
-            metadata: [{ $count: "total" }],
-            data: [
-              { $sort: { createdAt: -1 as const } },
-              { $skip: (page - 1) * limit },
-              { $limit: limit },
-            ],
-          },
-        },
-      ];
-
-      const [result] = await Meeting.aggregate(pipeline);
-      total = result.metadata[0]?.total ?? 0;
-      meetingDocs = result.data;
-    } else {
-      const paginated = await meetingService.getUserMeetingsPaginated(userId, {
-        page,
-        limit,
-        q,
-        status,
-      });
-      meetingDocs = paginated.meetings;
-      total = paginated.total;
-    }
+    const paginated = await meetingService.getUserMeetingsPaginated(userId, {
+      page,
+      limit,
+      q,
+      status,
+    });
+    const meetingDocs = paginated.meetings;
+    const total = paginated.total;
 
     const meetingIds = meetingDocs.map((m) => m._id);
     const [transcripts, recordings] = await Promise.all([
@@ -138,6 +75,90 @@ router.get("/", requireAuth, async (req, res) => {
   }
 });
 
+router.get("/stats", requireAuth, async (req, res) => {
+  try {
+    const userId = new Types.ObjectId(req.user!.userId);
+    const now = new Date();
+    const weekStart = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+    const prevWeekStart = new Date(now.getTime() - 14 * 24 * 60 * 60 * 1000);
+
+    const participantMatch = { "participants.userId": userId };
+
+    const [
+      recentMeetings,
+      allEndedMeetings,
+      meetingIdsForTranscripts,
+    ] = await Promise.all([
+      Meeting.find({
+        ...participantMatch,
+        status: "ended",
+        endedAt: { $gte: prevWeekStart, $lte: now },
+      })
+        .select("endedAt durationMs")
+        .lean(),
+      Meeting.find({
+        ...participantMatch,
+        status: "ended",
+        durationMs: { $gt: 0 },
+      })
+        .select("durationMs")
+        .lean(),
+      Meeting.find(participantMatch).distinct("_id"),
+    ]);
+
+    const thisWeek = recentMeetings.filter(
+      (m) => m.endedAt && m.endedAt >= weekStart
+    );
+    const lastWeek = recentMeetings.filter(
+      (m) => m.endedAt && m.endedAt < weekStart
+    );
+
+    const thisWeekHoursMs = thisWeek.reduce(
+      (s, m) => s + (m.durationMs ?? 0),
+      0
+    );
+    const lastWeekHoursMs = lastWeek.reduce(
+      (s, m) => s + (m.durationMs ?? 0),
+      0
+    );
+    const thisWeekHours = thisWeekHoursMs / 3600000;
+    const lastWeekHours = lastWeekHoursMs / 3600000;
+
+    const notesCompleted = await Transcript.countDocuments({
+      meetingId: { $in: meetingIdsForTranscripts },
+      notesStatus: "completed",
+    });
+    const transcriptsTotal = await Transcript.countDocuments({
+      meetingId: { $in: meetingIdsForTranscripts },
+    });
+
+    const avgDurationMs = allEndedMeetings.length
+      ? allEndedMeetings.reduce((s, m) => s + (m.durationMs ?? 0), 0) /
+        allEndedMeetings.length
+      : 0;
+    const avgDurationMin = Math.round(avgDurationMs / 60000);
+
+    res.json({
+      meetingsThisWeek: {
+        value: thisWeek.length,
+        delta: thisWeek.length - lastWeek.length,
+      },
+      hoursThisWeek: {
+        value: Number(thisWeekHours.toFixed(1)),
+        delta: Number((thisWeekHours - lastWeekHours).toFixed(1)),
+      },
+      notesGenerated: {
+        value: notesCompleted,
+        total: transcriptsTotal,
+      },
+      avgMeetingMin: { value: avgDurationMin },
+    });
+  } catch (err) {
+    console.error("Failed to fetch meeting stats:", err);
+    res.status(500).json({ message: "Failed to fetch meeting stats" });
+  }
+});
+
 router.get("/:id", requireAuth, async (req, res) => {
   try {
     const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
@@ -178,34 +199,6 @@ router.get("/:id", requireAuth, async (req, res) => {
   } catch (err) {
     console.error("Failed to fetch meeting:", err);
     res.status(500).json({ message: "Failed to fetch meeting" });
-  }
-});
-
-router.get("/:id/transcript", requireAuth, async (req, res) => {
-  try {
-    const meetingId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
-    const transcript = await Transcript.findOne({
-      meetingId,
-    }).lean();
-
-    if (!transcript) {
-      res.status(404).json({ message: "Transcript not found" });
-      return;
-    }
-
-    res.json({
-      id: transcript._id.toString(),
-      meetingId: transcript.meetingId.toString(),
-      status: transcript.status,
-      language: transcript.language,
-      segments: transcript.segments,
-      fullText: transcript.fullText,
-      createdAt: transcript.createdAt,
-      updatedAt: transcript.updatedAt,
-    });
-  } catch (err) {
-    console.error("Failed to fetch transcript:", err);
-    res.status(500).json({ message: "Failed to fetch transcript" });
   }
 });
 

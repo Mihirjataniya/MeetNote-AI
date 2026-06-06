@@ -31,12 +31,10 @@ export function Modal({ open, onClose, title, subtitle, children, footer, width 
         backdropFilter: "blur(6px)",
         animation: "fade-in 0.18s ease",
       }}
-      onClick={onClose}
     >
       <div
         className="bg-surface sm:rounded-[18px] rounded-t-[18px] shadow-lg border border-border overflow-hidden w-full sm:w-auto max-h-[90vh] sm:max-h-[85vh] flex flex-col"
         style={{ maxWidth: width, animation: "pop-in 0.22s cubic-bezier(0.2, 0.7, 0.3, 1)" }}
-        onClick={(e) => e.stopPropagation()}
       >
         <div className="px-5 sm:px-6 pt-5 pb-3.5 flex items-start gap-3.5 shrink-0">
           <div className="flex-1">

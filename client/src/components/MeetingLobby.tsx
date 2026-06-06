@@ -41,35 +41,67 @@ export function MeetingLobby({
     let cancelled = false;
 
     (async () => {
-      try {
-        if (!navigator.mediaDevices?.getUserMedia) {
-          setMediaError("Camera and microphone require HTTPS or localhost.");
-          setInitializing(false);
-          return;
-        }
-        const stream = await navigator.mediaDevices.getUserMedia({
-          audio: true,
-          video: true,
-        });
-        if (cancelled) {
-          stream.getTracks().forEach((t) => t.stop());
-          return;
-        }
-        streamRef.current = stream;
-        if (videoRef.current) {
-          videoRef.current.srcObject = stream;
-          videoRef.current.play().catch(() => {});
-        }
+      if (!navigator.mediaDevices?.getUserMedia) {
+        setMediaError("Camera and microphone require HTTPS or localhost.");
+        setCamOn(false);
+        setMicOn(false);
         setInitializing(false);
-      } catch (err) {
-        if (cancelled) return;
-        const message =
-          err instanceof Error
-            ? err.message
-            : "Unable to access camera or microphone.";
-        setMediaError(message);
-        setInitializing(false);
+        return;
       }
+
+      const tryGetMedia = async (
+        constraints: MediaStreamConstraints
+      ): Promise<MediaStream | null> => {
+        try {
+          return await navigator.mediaDevices.getUserMedia(constraints);
+        } catch {
+          return null;
+        }
+      };
+
+      let stream = await tryGetMedia({ audio: true, video: true });
+      let camFailed = false;
+      let micFailed = false;
+
+      if (!stream) {
+        stream = await tryGetMedia({ audio: true, video: false });
+        camFailed = true;
+      }
+      if (!stream) {
+        stream = await tryGetMedia({ audio: false, video: true });
+        camFailed = false;
+        micFailed = true;
+      }
+
+      if (cancelled) {
+        stream?.getTracks().forEach((t) => t.stop());
+        return;
+      }
+
+      if (!stream) {
+        setMediaError(
+          "Camera and microphone are unavailable. You can still join, but others won't see or hear you."
+        );
+        setCamOn(false);
+        setMicOn(false);
+        setInitializing(false);
+        return;
+      }
+
+      if (camFailed) {
+        setMediaError("Camera unavailable. Joining without video , you can still talk.");
+        setCamOn(false);
+      } else if (micFailed) {
+        setMediaError("Microphone unavailable. Joining without audio.");
+        setMicOn(false);
+      }
+
+      streamRef.current = stream;
+      if (videoRef.current && stream.getVideoTracks().length > 0) {
+        videoRef.current.srcObject = stream;
+        videoRef.current.play().catch(() => {});
+      }
+      setInitializing(false);
     })();
 
     return () => {
@@ -81,9 +113,10 @@ export function MeetingLobby({
 
   const toggleMic = useCallback(() => {
     const stream = streamRef.current;
-    if (!stream) return;
+    const tracks = stream?.getAudioTracks() ?? [];
+    if (tracks.length === 0) return;
     const next = !micOn;
-    stream.getAudioTracks().forEach((t) => {
+    tracks.forEach((t) => {
       t.enabled = next;
     });
     setMicOn(next);
@@ -91,9 +124,10 @@ export function MeetingLobby({
 
   const toggleCam = useCallback(() => {
     const stream = streamRef.current;
-    if (!stream) return;
+    const tracks = stream?.getVideoTracks() ?? [];
+    if (tracks.length === 0) return;
     const next = !camOn;
-    stream.getVideoTracks().forEach((t) => {
+    tracks.forEach((t) => {
       t.enabled = next;
     });
     setCamOn(next);
@@ -140,7 +174,7 @@ export function MeetingLobby({
   const showErrorState = !isHost && requestState === "error";
 
   const primaryDisabled =
-    !connected || initializing || !!mediaError || showRequestingState;
+    !connected || initializing || showRequestingState;
 
   return (
     <div className="h-full w-full flex items-center justify-center bg-[#0a0a0a] text-white px-4 py-6">
@@ -180,7 +214,7 @@ export function MeetingLobby({
           <div className="absolute bottom-3 right-3 flex items-center gap-1.5">
             <button
               onClick={toggleMic}
-              disabled={!streamRef.current}
+              disabled={!streamRef.current?.getAudioTracks().length}
               title={micOn ? "Mute microphone" : "Unmute microphone"}
               className={`w-10 h-10 rounded-full inline-flex items-center justify-center transition-colors active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed ${
                 micOn
@@ -192,7 +226,7 @@ export function MeetingLobby({
             </button>
             <button
               onClick={toggleCam}
-              disabled={!streamRef.current}
+              disabled={!streamRef.current?.getVideoTracks().length}
               title={camOn ? "Turn off camera" : "Turn on camera"}
               className={`w-10 h-10 rounded-full inline-flex items-center justify-center transition-colors active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed ${
                 camOn

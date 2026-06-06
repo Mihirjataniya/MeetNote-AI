@@ -63,9 +63,8 @@ export function StartMeetingModal({ open, onClose }: StartMeetingModalProps) {
         backdropFilter: "blur(6px)",
         animation: "fade-in 0.18s ease",
       }}
-      onClick={handleClose}
     >
-      <div className="flex flex-col items-stretch sm:items-center w-full sm:w-auto" onClick={(e) => e.stopPropagation()}>
+      <div className="flex flex-col items-stretch sm:items-center w-full sm:w-auto">
         {/* Tabs — outside modal, attached to top */}
         <div className="flex self-start ml-4 sm:ml-6">
           <button

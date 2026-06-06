@@ -315,20 +315,36 @@ export function useMediasoup(socket: TypedSocket | null, roomId: string | null) 
       );
     }
 
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        audio: true,
-        video: true,
-      });
-      setLocalStream(stream);
+    const tryGetMedia = async (
+      constraints: MediaStreamConstraints
+    ): Promise<MediaStream | null> => {
+      try {
+        return await navigator.mediaDevices.getUserMedia(constraints);
+      } catch {
+        return null;
+      }
+    };
 
-      for (const track of stream.getTracks()) {
+    let stream = await tryGetMedia({ audio: true, video: true });
+    if (!stream) stream = await tryGetMedia({ audio: true, video: false });
+    if (!stream) stream = await tryGetMedia({ audio: false, video: true });
+
+    if (!stream) {
+      producingInitRef.current = false;
+      throw new Error(
+        "Camera and microphone are unavailable. Please check your device permissions."
+      );
+    }
+
+    setLocalStream(stream);
+
+    for (const track of stream.getTracks()) {
+      try {
         const producer = await sendTransport.produce({ track });
         producersRef.current.set(producer.id, producer);
+      } catch (err) {
+        console.error(`[Mediasoup] Failed to produce ${track.kind} track:`, err);
       }
-    } catch (err) {
-      producingInitRef.current = false;
-      throw err;
     }
   }, [ensureDevice, createSendTransport, createRecvTransport]);
 

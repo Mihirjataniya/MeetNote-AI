@@ -447,15 +447,11 @@ export function Room({
 
       {/* ── Participants panel ── */}
       {showParticipants && (
-        <div
-          className="absolute inset-0 z-20 flex justify-end"
-          onClick={() => setShowParticipants(false)}
-        >
+        <div className="absolute inset-0 z-20 flex justify-end">
           <div className="absolute inset-0 bg-black/30 sm:bg-transparent" />
           <div
             className="relative w-[280px] sm:w-[300px] h-full bg-[#111] border-l border-white/[0.08] flex flex-col shadow-2xl"
             style={{ animation: "slide-in-right 0.2s ease" }}
-            onClick={(e) => e.stopPropagation()}
           >
             <div className="px-4 py-4 flex items-center justify-between border-b border-white/[0.08] shrink-0">
               <h3 className="text-[14px] font-semibold text-white">

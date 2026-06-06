@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import {
   fetchMeetings,
   fetchMeetingsPage,
+  fetchMeetingStats,
   type MeetingSummary,
   type MeetingsPageParams,
   type MeetingsPageResponse,
@@ -12,6 +13,7 @@ export const meetingKeys = {
   all: ["meetings"] as const,
   recent: (limit: number) => ["meetings", "recent", limit] as const,
   page: (params: MeetingsPageParams) => ["meetings", "page", params] as const,
+  stats: () => ["meetings", "stats"] as const,
 };
 
 export function useRecentMeetings(limit = 5) {
@@ -25,6 +27,13 @@ export function useMeetingsPage(params: MeetingsPageParams) {
   return useQuery({
     queryKey: meetingKeys.page(params),
     queryFn: () => fetchMeetingsPage(params),
+  });
+}
+
+export function useMeetingStats() {
+  return useQuery({
+    queryKey: meetingKeys.stats(),
+    queryFn: fetchMeetingStats,
   });
 }
 

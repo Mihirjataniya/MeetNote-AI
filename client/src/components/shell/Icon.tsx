@@ -48,6 +48,7 @@ import {
   SendHorizontal,
   Smile,
   GripVertical,
+  Loader2,
   type LucideIcon,
 } from "lucide-react";
 
@@ -100,6 +101,7 @@ const iconMap: Record<string, LucideIcon> = {
   send: SendHorizontal,
   smile: Smile,
   grip: GripVertical,
+  spinner: Loader2,
 };
 
 interface IconProps {

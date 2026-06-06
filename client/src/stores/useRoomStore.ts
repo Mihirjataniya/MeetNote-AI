@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { useSocketStore } from "./useSocketStore";
 import { isError } from "../types/index";
+import { playJoinRequestSound } from "../utils/notificationSound";
 import type {
   ParticipantInfo,
   PendingRequestInfo,
@@ -201,12 +202,17 @@ export const useRoomStore = create<RoomStore>((set, get) => ({
       }));
     };
     const handleJoinRequested = (payload: JoinRequestedPayload) => {
+      let added = false;
       set((s) => {
         if (s.pendingRequests.some((r) => r.socketId === payload.request.socketId)) {
           return s;
         }
+        added = true;
         return { pendingRequests: [...s.pendingRequests, payload.request] };
       });
+      if (added) {
+        playJoinRequestSound();
+      }
     };
     const handleJoinRequestCancelled = (payload: JoinRequestCancelledPayload) => {
       set((s) => ({

@@ -179,10 +179,7 @@ export function Sidebar() {
       {/* Mobile overlay */}
       {mobileOpen && (
         <div className="fixed inset-0 z-40 md:hidden" style={{ animation: "fade-in 0.18s ease" }}>
-          <div
-            className="absolute inset-0 bg-black/30 backdrop-blur-[2px]"
-            onClick={() => setMobileOpen(false)}
-          />
+          <div className="absolute inset-0 bg-black/30 backdrop-blur-[2px]" />
           <div
             className="relative w-[280px] h-full shadow-lg"
             style={{ animation: "slide-in-left 0.2s ease" }}

@@ -15,6 +15,7 @@ export interface AuthResponse {
     id: string;
     email: string;
     displayName: string;
+    createdAt?: string;
   };
 }
 

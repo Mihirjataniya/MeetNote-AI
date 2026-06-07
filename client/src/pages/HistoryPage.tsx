@@ -1,9 +1,32 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { Icon } from "../components/shell/Icon";
 import { MeetingRow } from "../components/MeetingRow";
 import { useMeetingsPage } from "../queries/useMeetingsQuery";
+import type { MeetingSortKey } from "../services/meetings";
 
 const PAGE_SIZE = 10;
+
+type DateRangeKey = "all" | "7d" | "30d" | "90d";
+
+const DATE_RANGE_LABELS: Record<DateRangeKey, string> = {
+  all: "All time",
+  "7d": "Last 7 days",
+  "30d": "Last 30 days",
+  "90d": "Last 90 days",
+};
+
+const SORT_LABELS: Record<MeetingSortKey, string> = {
+  newest: "Newest first",
+  oldest: "Oldest first",
+  longest: "Longest first",
+  shortest: "Shortest first",
+};
+
+function dateRangeToISO(key: DateRangeKey): string | undefined {
+  if (key === "all") return undefined;
+  const days = key === "7d" ? 7 : key === "30d" ? 30 : 90;
+  return new Date(Date.now() - days * 86_400_000).toISOString();
+}
 
 function Pagination({
   page,
@@ -38,17 +61,35 @@ function Pagination({
   );
 }
 
-export function HistoryPage() {
+const selectCls =
+  "h-8 px-3 rounded-lg border border-border-strong bg-surface text-[13px] text-foreground outline-none cursor-pointer hover:bg-surface-hover transition-colors";
 
+export function HistoryPage() {
   const [page, setPage] = useState(1);
   const [searchQuery, setSearchQuery] = useState("");
   const [debouncedQuery, setDebouncedQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
+  const [dateRange, setDateRange] = useState<DateRangeKey>("all");
+  const [pinnedOnly, setPinnedOnly] = useState(false);
+  const [hostedByMe, setHostedByMe] = useState(false);
+  const [sortKey, setSortKey] = useState<MeetingSortKey>("newest");
   const [filtersVisible, setFiltersVisible] = useState(false);
 
-  const hasActiveFilters = !!statusFilter;
+  const hasActiveFilters =
+    !!statusFilter ||
+    dateRange !== "all" ||
+    pinnedOnly ||
+    hostedByMe ||
+    sortKey !== "newest";
 
-  const prevFiltersRef = useRef({ q: "", status: "" });
+  const prevFiltersRef = useRef({
+    q: "",
+    status: "",
+    dateRange: "all" as DateRangeKey,
+    pinnedOnly: false,
+    hostedByMe: false,
+    sortKey: "newest" as MeetingSortKey,
+  });
 
   useEffect(() => {
     const timer = setTimeout(() => setDebouncedQuery(searchQuery), 300);
@@ -57,27 +98,52 @@ export function HistoryPage() {
 
   useEffect(() => {
     const prev = prevFiltersRef.current;
-    const changed = prev.q !== debouncedQuery || prev.status !== statusFilter;
+    const changed =
+      prev.q !== debouncedQuery ||
+      prev.status !== statusFilter ||
+      prev.dateRange !== dateRange ||
+      prev.pinnedOnly !== pinnedOnly ||
+      prev.hostedByMe !== hostedByMe ||
+      prev.sortKey !== sortKey;
     if (changed && page !== 1) {
       setPage(1);
     }
-    prevFiltersRef.current = { q: debouncedQuery, status: statusFilter };
-  }, [debouncedQuery, statusFilter, page]);
+    prevFiltersRef.current = {
+      q: debouncedQuery,
+      status: statusFilter,
+      dateRange,
+      pinnedOnly,
+      hostedByMe,
+      sortKey,
+    };
+  }, [debouncedQuery, statusFilter, dateRange, pinnedOnly, hostedByMe, sortKey, page]);
 
-  const { data, isLoading: loading } = useMeetingsPage({
-    page,
-    limit: PAGE_SIZE,
-    q: debouncedQuery || undefined,
-    status: statusFilter || undefined,
-  });
+  const queryParams = useMemo(
+    () => ({
+      page,
+      limit: PAGE_SIZE,
+      q: debouncedQuery || undefined,
+      status: statusFilter || undefined,
+      from: dateRangeToISO(dateRange),
+      pinnedOnly: pinnedOnly || undefined,
+      hostedByMe: hostedByMe || undefined,
+      sort: sortKey,
+    }),
+    [page, debouncedQuery, statusFilter, dateRange, pinnedOnly, hostedByMe, sortKey]
+  );
+
+  const { data, isLoading: loading } = useMeetingsPage(queryParams);
 
   const meetings = data?.meetings ?? [];
   const total = data?.total ?? 0;
   const totalPages = Math.ceil(total / PAGE_SIZE);
 
-
   const clearFilters = () => {
     setStatusFilter("");
+    setDateRange("all");
+    setPinnedOnly(false);
+    setHostedByMe(false);
+    setSortKey("newest");
   };
 
   return (
@@ -128,12 +194,60 @@ export function HistoryPage() {
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
-            className="h-8 px-3 rounded-lg border border-border-strong bg-surface text-[13px] text-foreground outline-none cursor-pointer hover:bg-surface-hover transition-colors"
+            className={selectCls}
+            aria-label="Status"
           >
             <option value="">All statuses</option>
             <option value="active">Active</option>
             <option value="ended">Ended</option>
           </select>
+
+          <select
+            value={dateRange}
+            onChange={(e) => setDateRange(e.target.value as DateRangeKey)}
+            className={selectCls}
+            aria-label="Date range"
+          >
+            {(Object.keys(DATE_RANGE_LABELS) as DateRangeKey[]).map((k) => (
+              <option key={k} value={k}>{DATE_RANGE_LABELS[k]}</option>
+            ))}
+          </select>
+
+          <select
+            value={sortKey}
+            onChange={(e) => setSortKey(e.target.value as MeetingSortKey)}
+            className={selectCls}
+            aria-label="Sort"
+          >
+            {(Object.keys(SORT_LABELS) as MeetingSortKey[]).map((k) => (
+              <option key={k} value={k}>{SORT_LABELS[k]}</option>
+            ))}
+          </select>
+
+          <button
+            type="button"
+            onClick={() => setPinnedOnly((v) => !v)}
+            className={`h-8 px-[11px] rounded-lg border text-[13px] font-medium inline-flex items-center gap-1.5 transition-colors ${
+              pinnedOnly
+                ? "border-accent bg-accent/[0.08] text-foreground"
+                : "border-border-strong bg-surface text-secondary hover:bg-surface-hover hover:text-foreground"
+            }`}
+          >
+            <Icon name="pin" size={12} /> Pinned only
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setHostedByMe((v) => !v)}
+            className={`h-8 px-[11px] rounded-lg border text-[13px] font-medium inline-flex items-center gap-1.5 transition-colors ${
+              hostedByMe
+                ? "border-accent bg-accent/[0.08] text-foreground"
+                : "border-border-strong bg-surface text-secondary hover:bg-surface-hover hover:text-foreground"
+            }`}
+          >
+            <Icon name="user" size={12} /> Hosted by me
+          </button>
+
           {hasActiveFilters && (
             <button
               onClick={clearFilters}

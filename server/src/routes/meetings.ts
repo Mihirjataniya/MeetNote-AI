@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { Types } from "mongoose";
 import { requireAuth } from "../middleware/auth";
-import { meetingService } from "../services/meetingService";
+import { meetingService, type MeetingSortKey } from "../services/meetingService";
 import { Meeting } from "../models/Meeting";
 import { Transcript } from "../models/Transcript";
 import { Recording } from "../models/Recording";
@@ -10,6 +10,19 @@ function qp(val: unknown): string | undefined {
   const s = Array.isArray(val) ? val[0] : val;
   return typeof s === "string" && s ? s : undefined;
 }
+
+function parseDate(raw: string | undefined): Date | undefined {
+  if (!raw) return undefined;
+  const d = new Date(raw);
+  return Number.isNaN(d.getTime()) ? undefined : d;
+}
+
+const SORT_KEYS: ReadonlySet<MeetingSortKey> = new Set([
+  "newest",
+  "oldest",
+  "longest",
+  "shortest",
+]);
 
 const router = Router();
 
@@ -22,6 +35,15 @@ router.get("/", requireAuth, async (req, res) => {
     );
     const q = qp(req.query.q);
     const status = qp(req.query.status);
+    const from = parseDate(qp(req.query.from));
+    const to = parseDate(qp(req.query.to));
+    const pinnedOnly = qp(req.query.pinnedOnly) === "true";
+    const hostedByMe = qp(req.query.hostedByMe) === "true";
+    const sortRaw = qp(req.query.sort);
+    const sort =
+      sortRaw && SORT_KEYS.has(sortRaw as MeetingSortKey)
+        ? (sortRaw as MeetingSortKey)
+        : undefined;
     const userId = req.user!.userId;
 
     const paginated = await meetingService.getUserMeetingsPaginated(userId, {
@@ -29,6 +51,11 @@ router.get("/", requireAuth, async (req, res) => {
       limit,
       q,
       status,
+      from,
+      to,
+      pinnedOnly,
+      hostedByMe,
+      sort,
     });
     const meetingDocs = paginated.meetings;
     const total = paginated.total;

@@ -36,11 +36,18 @@ function authHeaders(): HeadersInit {
   return token ? { Authorization: `Bearer ${token}` } : {};
 }
 
+export type MeetingSortKey = "newest" | "oldest" | "longest" | "shortest";
+
 export interface MeetingsPageParams {
   page?: number;
   limit?: number;
   q?: string;
   status?: string;
+  from?: string;
+  to?: string;
+  pinnedOnly?: boolean;
+  hostedByMe?: boolean;
+  sort?: MeetingSortKey;
 }
 
 export interface MeetingsPageResponse {
@@ -68,6 +75,11 @@ export async function fetchMeetingsPage(
   if (params.limit) sp.set("limit", String(params.limit));
   if (params.q) sp.set("q", params.q);
   if (params.status) sp.set("status", params.status);
+  if (params.from) sp.set("from", params.from);
+  if (params.to) sp.set("to", params.to);
+  if (params.pinnedOnly) sp.set("pinnedOnly", "true");
+  if (params.hostedByMe) sp.set("hostedByMe", "true");
+  if (params.sort) sp.set("sort", params.sort);
 
   const res = await fetch(
     `${API_BASE}/api/meetings?${sp.toString()}`,

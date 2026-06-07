@@ -49,6 +49,9 @@ import {
   Smile,
   GripVertical,
   Loader2,
+  Sun,
+  Moon,
+  Monitor,
   type LucideIcon,
 } from "lucide-react";
 
@@ -102,6 +105,9 @@ const iconMap: Record<string, LucideIcon> = {
   smile: Smile,
   grip: GripVertical,
   spinner: Loader2,
+  sun: Sun,
+  moon: Moon,
+  monitor: Monitor,
 };
 
 interface IconProps {

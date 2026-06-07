@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { authService } from "../services/authService";
+import { userService } from "../services/userService";
 import { requireAuth } from "../middleware/auth";
 import type {
   RegisterPayload,
@@ -47,6 +48,7 @@ router.post("/register", async (req, res) => {
         id: user._id.toString(),
         email: user.email,
         displayName: user.displayName,
+        createdAt: user.createdAt.toISOString(),
       },
     };
     res.status(201).json(response);
@@ -79,6 +81,7 @@ router.post("/login", async (req, res) => {
         id: user._id.toString(),
         email: user.email,
         displayName: user.displayName,
+        createdAt: user.createdAt.toISOString(),
       },
     };
     res.json(response);
@@ -88,8 +91,26 @@ router.post("/login", async (req, res) => {
   }
 });
 
-router.get("/me", requireAuth, (req, res) => {
-  res.json({ user: req.user });
+router.get("/me", requireAuth, async (req, res) => {
+  // Fetch from DB so profile updates are reflected without re-issuing the JWT.
+  try {
+    const user = await userService.getById(req.user!.userId);
+    if (!user) {
+      res.status(404).json({ message: "User not found" });
+      return;
+    }
+    res.json({
+      user: {
+        id: user._id.toString(),
+        email: user.email,
+        displayName: user.displayName,
+        createdAt: user.createdAt.toISOString(),
+      },
+    });
+  } catch (err) {
+    console.error("[Auth] /me failed:", err);
+    res.status(500).json({ message: "Failed to fetch user" });
+  }
 });
 
 export default router;

@@ -23,6 +23,8 @@ interface AuthStore {
     displayName: string
   ) => Promise<void>;
   logout: () => void;
+  setUser: (user: AuthUser) => void;
+  refreshUser: () => Promise<void>;
 }
 
 export const useAuthStore = create<AuthStore>()(
@@ -61,6 +63,15 @@ export const useAuthStore = create<AuthStore>()(
     logout: () => {
       clearToken();
       set({ token: null, user: null });
+    },
+
+    setUser: (user) => set({ user }),
+
+    refreshUser: async () => {
+      const { token } = get();
+      if (!token) return;
+      const { user } = await fetchMe(token);
+      set({ user });
     },
   }))
 );

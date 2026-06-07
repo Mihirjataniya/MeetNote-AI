@@ -123,7 +123,7 @@ export function NotificationBell() {
 
       {open && (
         <div
-          className="absolute right-0 top-[42px] w-[360px] max-w-[calc(100vw-32px)] bg-surface border border-border rounded-[14px] shadow-lg z-50 overflow-hidden flex flex-col"
+          className="absolute right-0 top-[42px] w-[360px] max-w-[calc(100vw-32px)] bg-surface border border-border rounded-[14px] z-50 overflow-hidden flex flex-col shadow-[0_12px_32px_rgba(0,0,0,0.14),0_4px_10px_rgba(0,0,0,0.08),0_0_0_1px_rgba(0,0,0,0.04)]"
           style={{ animation: "pop-in 0.18s ease" }}
         >
           <div className="flex items-center justify-between px-4 py-3 border-b border-border">

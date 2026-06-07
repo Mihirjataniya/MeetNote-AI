@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useAuthStore } from "../stores/useAuthStore";
 import { useRoomStore } from "../stores/useRoomStore";
 import { useSocketStore } from "../stores/useSocketStore";
+import { getUserPreferences } from "../services/userPreferences";
 import { Icon } from "./shell/Icon";
 import { Avatar } from "./shell/Avatar";
 
@@ -32,8 +33,9 @@ export function MeetingLobby({
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
 
-  const [micOn, setMicOn] = useState(true);
-  const [camOn, setCamOn] = useState(true);
+  // Honor per-device defaults from Settings → Meeting Preferences.
+  const [micOn, setMicOn] = useState(() => getUserPreferences().defaultMicOn);
+  const [camOn, setCamOn] = useState(() => getUserPreferences().defaultCamOn);
   const [mediaError, setMediaError] = useState<string | null>(null);
   const [initializing, setInitializing] = useState(true);
 
@@ -97,6 +99,13 @@ export function MeetingLobby({
       }
 
       streamRef.current = stream;
+      // Apply user's pref to freshly-acquired tracks (track.enabled defaults to true).
+      stream.getAudioTracks().forEach((t) => {
+        t.enabled = micOn && !micFailed;
+      });
+      stream.getVideoTracks().forEach((t) => {
+        t.enabled = camOn && !camFailed;
+      });
       if (videoRef.current && stream.getVideoTracks().length > 0) {
         videoRef.current.srcObject = stream;
         videoRef.current.play().catch(() => {});

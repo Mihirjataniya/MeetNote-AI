@@ -138,6 +138,14 @@ function SidebarContent() {
         >
           <Icon name={collapsed ? "panelLeftOpen" : "panelLeftClose"} size={14} />
         </button>
+        <button
+          onClick={closeMobile}
+          className="md:hidden inline-flex w-7 h-7 rounded-md items-center justify-center text-tertiary hover:bg-hover hover:text-foreground transition-colors"
+          title="Close menu"
+          aria-label="Close menu"
+        >
+          <Icon name="x" size={16} />
+        </button>
       </div>
 
       {/* Action buttons */}

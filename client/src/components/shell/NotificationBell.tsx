@@ -48,6 +48,16 @@ function timeAgo(iso: string): string {
   return new Date(iso).toLocaleDateString(undefined, { day: "numeric", month: "short" });
 }
 
+function fmtScheduled(iso: string): string {
+  return new Date(iso).toLocaleString(undefined, {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  });
+}
+
 function routeFor(n: NotificationItem): string {
   switch (n.type) {
     case "transcript-ready":
@@ -167,7 +177,7 @@ export function NotificationBell() {
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-start gap-2">
-                      <div className="text-[12.5px] font-semibold text-foreground leading-snug flex-1">
+                      <div className="text-[12.5px] font-semibold text-foreground leading-snug flex-1 overflow-hidden text-ellipsis whitespace-nowrap">
                         {n.title}
                       </div>
                       {isUnread && (
@@ -177,6 +187,13 @@ export function NotificationBell() {
                     {n.body && (
                       <div className="text-[11.5px] text-secondary mt-0.5 leading-snug overflow-hidden text-ellipsis whitespace-nowrap">
                         {n.body}
+                      </div>
+                    )}
+                    {(n.actorName || n.scheduledStartTime) && (
+                      <div className="text-[11px] text-tertiary mt-0.5 leading-snug overflow-hidden text-ellipsis whitespace-nowrap">
+                        {n.actorName && <span>Hosted by {n.actorName}</span>}
+                        {n.actorName && n.scheduledStartTime && <span> · </span>}
+                        {n.scheduledStartTime && <span>{fmtScheduled(n.scheduledStartTime)}</span>}
                       </div>
                     )}
                     <div className="text-[10.5px] text-tertiary mt-1">

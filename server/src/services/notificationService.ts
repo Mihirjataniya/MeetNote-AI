@@ -1,6 +1,7 @@
 import { Types } from "mongoose";
 import { getIO } from "../socket/index";
 import { Meeting } from "../models/Meeting";
+import { User } from "../models/User";
 import { Notification, type INotification } from "../models/Notification";
 import { sendPushToUser } from "./pushService";
 import type { MeetingStateChangeKind, NotificationType, NotificationPayload } from "../types/index";
@@ -14,6 +15,8 @@ function toPayload(n: INotification): NotificationPayload {
     meetingId: n.meetingId?.toString(),
     roomId: n.roomId,
     requesterName: n.requesterName,
+    actorName: n.actorName,
+    scheduledStartTime: n.scheduledStartTime ? n.scheduledStartTime.toISOString() : null,
     readAt: n.readAt ? n.readAt.toISOString() : null,
     createdAt: n.createdAt.toISOString(),
   };
@@ -27,6 +30,8 @@ interface CreateOpts {
   meetingId?: string | Types.ObjectId;
   roomId?: string;
   requesterName?: string;
+  actorName?: string;
+  scheduledStartTime?: Date | null;
 }
 
 export async function createNotification(opts: CreateOpts): Promise<NotificationPayload | null> {
@@ -39,6 +44,8 @@ export async function createNotification(opts: CreateOpts): Promise<Notification
       meetingId: opts.meetingId,
       roomId: opts.roomId,
       requesterName: opts.requesterName,
+      actorName: opts.actorName,
+      scheduledStartTime: opts.scheduledStartTime,
     });
     const payload = toPayload(doc);
     try {
@@ -159,20 +166,30 @@ const STATE_TYPES: Record<MeetingStateChangeKind, NotificationType> = {
 
 export async function notifyMeetingStateChanged(
   meetingIds: string[],
-  kind: MeetingStateChangeKind
+  kind: MeetingStateChangeKind,
+  actorUserId?: string
 ): Promise<void> {
   if (meetingIds.length === 0) return;
   try {
     const io = getIO();
     const meetings = await Meeting.find({ _id: { $in: meetingIds } })
-      .select("createdBy invitedUserIds title roomId")
+      .select("createdBy invitedUserIds title roomId scheduledStartTime")
       .lean();
+
+    // Batch-fetch host display names so the bell can show "Hosted by <name>".
+    const hostIds = Array.from(new Set(meetings.map((m) => m.createdBy.toString())));
+    const hosts = await User.find({ _id: { $in: hostIds } })
+      .select("displayName")
+      .lean();
+    const hostNameById = new Map(hosts.map((u) => [u._id.toString(), u.displayName]));
 
     for (const m of meetings) {
       // Audience: invitees + host. For `started`, skip the host since they're already in.
+      // Also drop the actor — no point telling Mihir he cancelled his own meeting.
       const audience = new Set<string>();
       for (const id of m.invitedUserIds ?? []) audience.add(id.toString());
       if (kind !== "started") audience.add(m.createdBy.toString());
+      if (actorUserId) audience.delete(actorUserId);
 
       for (const userId of audience) {
         io.to(`user:${userId}`).emit("meeting-state-changed", {
@@ -182,12 +199,15 @@ export async function notifyMeetingStateChanged(
       }
 
       const title = m.title ?? "Untitled meeting";
+      const actorName = hostNameById.get(m.createdBy.toString());
       await createBulk(Array.from(audience), {
         type: STATE_TYPES[kind],
-        title: STATE_TITLES[kind],
-        body: `"${title}"`,
+        title,
+        body: STATE_TITLES[kind],
         meetingId: m._id.toString(),
         roomId: m.roomId,
+        actorName,
+        scheduledStartTime: m.scheduledStartTime ?? null,
       });
     }
   } catch (err) {

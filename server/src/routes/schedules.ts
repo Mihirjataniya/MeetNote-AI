@@ -29,7 +29,7 @@ router.post("/", requireAuth, async (req, res) => {
     const userId = req.user!.userId;
     const dto = req.body as ScheduleMeetingDTO;
     const { created, clipped } = await scheduleService.createScheduled(userId, dto);
-    notifyMeetingStateChanged(created.map((c) => c.id), "created").catch((e) =>
+    notifyMeetingStateChanged(created.map((c) => c.id), "created", userId).catch((e) =>
       console.error("[Schedules] notify failed:", e)
     );
     res.status(201).json({ schedules: created, clipped });
@@ -75,7 +75,7 @@ router.patch("/:id", requireAuth, async (req, res) => {
     const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
     const dto = req.body as UpdateScheduleDTO;
     const updated = await scheduleService.updateScheduled(id, userId, dto);
-    notifyMeetingStateChanged([updated.id], "updated").catch((e) =>
+    notifyMeetingStateChanged([updated.id], "updated", userId).catch((e) =>
       console.error("[Schedules] notify failed:", e)
     );
     res.json(updated);
@@ -89,7 +89,7 @@ router.delete("/:id", requireAuth, async (req, res) => {
     const userId = req.user!.userId;
     const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
     await scheduleService.cancelScheduled(id, userId);
-    notifyMeetingStateChanged([id], "cancelled").catch((e) =>
+    notifyMeetingStateChanged([id], "cancelled", userId).catch((e) =>
       console.error("[Schedules] notify failed:", e)
     );
     res.json({ ok: true });
@@ -103,7 +103,7 @@ router.delete("/:id/series", requireAuth, async (req, res) => {
     const userId = req.user!.userId;
     const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
     const count = await scheduleService.cancelSeries(id, userId);
-    notifyMeetingStateChanged([id], "series-cancelled").catch((e) =>
+    notifyMeetingStateChanged([id], "series-cancelled", userId).catch((e) =>
       console.error("[Schedules] notify failed:", e)
     );
     res.json({ ok: true, cancelledCount: count });

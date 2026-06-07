@@ -22,6 +22,8 @@ export interface NotificationItem {
   meetingId?: string;
   roomId?: string;
   requesterName?: string;
+  actorName?: string;
+  scheduledStartTime?: string | null;
   readAt: string | null;
   createdAt: string;
 }

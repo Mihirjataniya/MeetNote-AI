@@ -11,6 +11,8 @@ export interface INotification extends Document {
   meetingId?: Types.ObjectId;
   roomId?: string;
   requesterName?: string;
+  actorName?: string;
+  scheduledStartTime?: Date | null;
   readAt?: Date | null;
   createdAt: Date;
   updatedAt: Date;
@@ -25,6 +27,8 @@ const notificationSchema = new Schema<INotification>(
     meetingId: { type: Schema.Types.ObjectId, ref: "Meeting" },
     roomId: { type: String },
     requesterName: { type: String },
+    actorName: { type: String },
+    scheduledStartTime: { type: Date, default: null },
     readAt: { type: Date, default: null },
   },
   { timestamps: true }

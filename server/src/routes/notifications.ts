@@ -40,6 +40,8 @@ router.get("/", requireAuth, async (req, res) => {
         meetingId: n.meetingId?.toString(),
         roomId: n.roomId,
         requesterName: n.requesterName,
+        actorName: n.actorName,
+        scheduledStartTime: n.scheduledStartTime ? n.scheduledStartTime.toISOString() : null,
         readAt: n.readAt ? n.readAt.toISOString() : null,
         createdAt: n.createdAt.toISOString(),
       })),

@@ -39,6 +39,21 @@ export const config = {
     apiKey: process.env.GEMINI_API_KEY || "",
     model: process.env.GEMINI_MODEL || "gemini-flash-latest",
   },
+  sqs: {
+    region: process.env.AWS_REGION || "us-east-1",
+    // Set for local emulators (ElasticMQ http://localhost:9324, LocalStack
+    // http://localhost:4566). Leave unset to hit real AWS SQS.
+    endpoint: process.env.SQS_ENDPOINT || undefined,
+    accessKeyId: process.env.AWS_ACCESS_KEY_ID || "",
+    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY || "",
+    queuePrefix: process.env.SQS_QUEUE_PREFIX || "meetnote",
+    // When true, the SQS consumer loops run inside this process. Set false to
+    // run the API/socket server without workers (workers run via a separate
+    // entry point in a multi-process deployment).
+    workerEnabled: process.env.SQS_WORKER_ENABLED !== "false",
+    // Deliveries before a message is sent to its dead-letter queue.
+    maxReceiveCount: parseInt(process.env.SQS_MAX_RECEIVE_COUNT || "5", 10),
+  },
   webPush: {
     publicKey: process.env.VAPID_PUBLIC_KEY || "",
     privateKey: process.env.VAPID_PRIVATE_KEY || "",

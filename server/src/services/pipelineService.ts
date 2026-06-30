@@ -1,136 +1,43 @@
-import fs from "node:fs";
 import { recordingService } from "./recordingService";
-import { storageService } from "./storageService";
-import { transcriptionService } from "./transcriptionService";
 import { chunkTranscriptionService } from "./chunkTranscriptionService";
-import { notifyTranscriptStatus } from "./notificationService";
 import { Recording } from "../models/Recording";
-import { Transcript } from "../models/Transcript";
-import { meetingNotesService } from "./meetingNotesService";
+import { enqueue } from "../queue/queues";
 
+// Triggered when the last participant leaves. The heavy work (Cloudinary
+// upload, full-file fallback transcription, notes) now runs in SQS workers;
+// this method only does the live-room-bound steps then enqueues finalize.
 class PipelineService {
-  private running = new Set<string>();
-
   async run(
     roomId: string,
     meetingId: string,
     recordingResult?: { webmPaths: string[]; roomDir: string; startedAt: Date } | null
   ): Promise<void> {
-    if (this.running.has(roomId)) return;
-    this.running.add(roomId);
+    console.log(`[Pipeline] Enqueuing finalize for room ${roomId}, meeting ${meetingId}`);
 
-    console.log(`[Pipeline] Starting for room ${roomId}, meeting ${meetingId}`);
+    const result = recordingResult ?? recordingService.stopRecording(roomId);
 
-    try {
-      const recording = await Recording.findOne({ meetingId, status: "recording" });
-      if (!recording) {
-        console.warn(`[Pipeline] No recording found for meeting ${meetingId}`);
-        return;
-      }
+    // Seal any leftover accumulated chunks as the final batch before we hand
+    // off — must happen here (main process) since accumulation is in-memory.
+    await chunkTranscriptionService.flushRoom(roomId);
 
-      recording.status = "processing";
-      recording.stoppedAt = new Date();
-      await recording.save();
+    const recording = await Recording.findOne({ meetingId }).select("startedAt");
 
-      const result = recordingResult ?? recordingService.stopRecording(roomId);
-      if (!result) {
-        console.error(`[Pipeline] No recording result for room ${roomId}`);
-        recording.status = "failed";
-        await recording.save();
-        return;
-      }
+    await enqueue("finalizePipeline", {
+      roomId,
+      meetingId,
+      roomDir: result?.roomDir ?? recordingService.getUploadDir(roomId) ?? "",
+      webmPaths: result?.webmPaths ?? [],
+      startedAtMs: result?.startedAt
+        ? new Date(result.startedAt).getTime()
+        : recording?.startedAt
+          ? new Date(recording.startedAt).getTime()
+          : 0,
+      attempt: 0,
+    });
 
-      // Grace period for late-arriving uploads (final chunk race)
-      await new Promise((r) => setTimeout(r, 3000));
-
-      const webmPaths = recordingService.collectFiles(roomId);
-      if (webmPaths.length === 0) {
-        console.error(`[Pipeline] No audio files for room ${roomId}`);
-        recording.status = "failed";
-        await recording.save();
-        return;
-      }
-
-      console.log(`[Pipeline] ${webmPaths.length} file(s) to process for room ${roomId}`);
-
-      await chunkTranscriptionService.waitForRoom(roomId);
-
-      console.log(`[Pipeline] Uploading to Cloudinary…`);
-      const cloudinaryFiles = await storageService.uploadAudioFiles(
-        webmPaths,
-        roomId
-      );
-
-      const durationMs = result.startedAt
-        ? Date.now() - result.startedAt.getTime()
-        : 0;
-
-      recording.cloudinaryUrls = cloudinaryFiles;
-      recording.durationMs = durationMs;
-      recording.status = "ready";
-      await recording.save();
-
-      const existingTranscript = await Transcript.findOne({ meetingId });
-
-      if (!existingTranscript) {
-        console.log(`[Pipeline] No incremental transcript found, falling back to full transcription`);
-        const wavPath = await recordingService.mergeToWav(
-          webmPaths,
-          result.roomDir
-        );
-
-        await transcriptionService.transcribe(
-          recording._id.toString(),
-          meetingId,
-          wavPath
-        );
-
-        meetingNotesService.generate(meetingId).catch((err) =>
-          console.error(`[Pipeline] Notes generation failed for meeting ${meetingId}:`, err)
-        );
-
-        this.cleanupLocalFiles(webmPaths, result.roomDir, wavPath);
-      } else {
-        if (existingTranscript.status === "processing") {
-          existingTranscript.status = "completed";
-          await existingTranscript.save();
-          await notifyTranscriptStatus(meetingId, "completed");
-        }
-
-        meetingNotesService.generate(meetingId).catch((err) =>
-          console.error(`[Pipeline] Notes generation failed for meeting ${meetingId}:`, err)
-        );
-
-        console.log(`[Pipeline] Incremental transcript already exists, skipping transcription`);
-        this.cleanupLocalFiles(webmPaths, result.roomDir);
-      }
-
-      console.log(`[Pipeline] Completed for room ${roomId}`);
-    } catch (err) {
-      console.error(`[Pipeline] Error for room ${roomId}:`, err);
-      await Recording.updateOne(
-        { meetingId, status: "processing" },
-        { $set: { status: "failed" } }
-      );
-      await notifyTranscriptStatus(meetingId, "failed");
-    } finally {
-      this.running.delete(roomId);
-      recordingService.cleanup(roomId);
-    }
-  }
-
-  private cleanupLocalFiles(
-    webmPaths: string[],
-    roomDir: string,
-    wavPath?: string
-  ): void {
-    for (const p of webmPaths) {
-      try { fs.unlinkSync(p); } catch {}
-    }
-    if (wavPath) {
-      try { fs.unlinkSync(wavPath); } catch {}
-    }
-    try { fs.rmdirSync(roomDir); } catch {}
+    // Drop in-memory recording state; files on disk are consumed by the
+    // finalize worker which re-scans the room directory.
+    recordingService.cleanup(roomId);
   }
 }
 

@@ -21,6 +21,13 @@ export interface ITranscript extends Document {
   meetingNotes?: string;
   notesStatus?: NotesStatus;
   lastProcessedBatch: number;
+  // Distinct batch indices that have been transcribed. Used as the
+  // idempotency key for at-least-once SQS delivery, and counted against
+  // expectedBatchCount so finalize knows when every batch has landed.
+  processedBatches: number[];
+  // Set when the final batch is transcribed (= total number of sealed
+  // batches). Null until then, which tells finalize to keep waiting.
+  expectedBatchCount?: number;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -64,6 +71,8 @@ const transcriptSchema = new Schema<ITranscript>(
       default: "pending",
     },
     lastProcessedBatch: { type: Number, default: -1 },
+    processedBatches: { type: [Number], default: [] },
+    expectedBatchCount: { type: Number },
   },
   { timestamps: true }
 );

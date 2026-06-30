@@ -47,6 +47,8 @@ class MeetingNotesService {
       await transcript.save();
       await notifyNotesStatus(meetingId, "failed");
       console.error(`[MeetingNotes] Failed for meeting ${meetingId}:`, err);
+      // Rethrow so the SQS worker leaves the message for retry / DLQ.
+      throw err;
     }
   }
 

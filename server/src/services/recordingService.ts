@@ -1,4 +1,3 @@
-import { spawn } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { config } from "../config/index";
@@ -62,52 +61,6 @@ class RecordingService {
 
   cleanup(roomId: string): void {
     this.recordings.delete(roomId);
-  }
-
-  mergeToWav(webmPaths: string[], roomDir: string): Promise<string> {
-    return new Promise((resolve, reject) => {
-      const outputPath = path.join(roomDir, "mixed.wav");
-
-      if (webmPaths.length === 0) {
-        reject(new Error("No audio files to merge"));
-        return;
-      }
-
-      if (webmPaths.length === 1) {
-        const ffmpeg = spawn("ffmpeg", [
-          "-i", webmPaths[0],
-          "-ac", "1",
-          "-ar", "16000",
-          "-y",
-          outputPath,
-        ]);
-        ffmpeg.on("exit", (code) => {
-          if (code === 0) resolve(outputPath);
-          else reject(new Error(`FFmpeg merge exited with code ${code}`));
-        });
-        ffmpeg.on("error", reject);
-        return;
-      }
-
-      const args: string[] = [];
-      for (const p of webmPaths) {
-        args.push("-i", p);
-      }
-      args.push(
-        "-filter_complex", `amix=inputs=${webmPaths.length}:duration=longest`,
-        "-ac", "1",
-        "-ar", "16000",
-        "-y",
-        outputPath
-      );
-
-      const ffmpeg = spawn("ffmpeg", args);
-      ffmpeg.on("exit", (code) => {
-        if (code === 0) resolve(outputPath);
-        else reject(new Error(`FFmpeg merge exited with code ${code}`));
-      });
-      ffmpeg.on("error", reject);
-    });
   }
 
   getMeetingId(roomId: string): string | null {

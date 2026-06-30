@@ -10,6 +10,10 @@ export interface IRecording extends Document {
   status: RecordingStatus;
   durationMs?: number;
   cloudinaryUrls?: CloudinaryFile[];
+  // True once at least one transcription batch was enqueued. Lets the
+  // finalize worker distinguish "incremental transcript pending" from
+  // "no chunks ever arrived → run full-file fallback".
+  incremental?: boolean;
   startedAt: Date;
   stoppedAt?: Date;
   createdAt: Date;
@@ -35,6 +39,7 @@ const recordingSchema = new Schema<IRecording>(
       required: true,
     },
     durationMs: { type: Number },
+    incremental: { type: Boolean, default: false },
     cloudinaryUrls: [
       {
         fileName: { type: String, required: true },

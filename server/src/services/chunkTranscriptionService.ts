@@ -1,13 +1,7 @@
-import { DeepgramClient } from "@deepgram/sdk";
-import { spawn } from "node:child_process";
-import fs from "node:fs";
-import path from "node:path";
-import { config } from "../config/index";
-import { Transcript, type ITranscriptSegment } from "../models/Transcript";
-import { Recording } from "../models/Recording";
 import { Meeting } from "../models/Meeting";
-import { notifyTranscriptStatus } from "./notificationService";
+import { Recording } from "../models/Recording";
 import { recordingService } from "./recordingService";
+import { enqueue } from "../queue/queues";
 
 interface ChunkEntry {
   webmPath: string;
@@ -25,9 +19,12 @@ interface PendingBatch {
 
 const COLLECTION_TIMEOUT_MS = 15_000;
 
+// Live-room batch accumulator. This stays in the main process because
+// sealing depends on the current active-participant count and per-room
+// timers. Once a batch is sealed it is handed to SQS (transcribe-batch
+// queue) where a worker does the heavy ffmpeg + Deepgram work.
 class ChunkTranscriptionService {
   private batches = new Map<string, PendingBatch>();
-  private processing = new Map<string, Promise<void>>();
 
   async onChunkReceived(
     roomId: string,
@@ -45,10 +42,12 @@ class ChunkTranscriptionService {
     }
 
     let batch = this.batches.get(roomId);
-
     if (!batch) {
       batch = { chunks: [], timer: null, batchIndex: 0, isFinal: false, meetingId };
       this.batches.set(roomId, batch);
+      // Flag the recording as incremental so finalize waits for batches
+      // instead of running the full-file fallback.
+      await Recording.updateOne({ meetingId }, { $set: { incremental: true } });
     }
 
     batch.chunks.push({ webmPath, userId, chunkStartMs });
@@ -62,13 +61,18 @@ class ChunkTranscriptionService {
     const uniqueUsers = new Set(batch.chunks.map((c) => c.userId));
 
     if (uniqueUsers.size >= activeParticipantCount || isFinal) {
-      this.sealBatch(roomId);
+      await this.sealBatch(roomId);
     } else if (!batch.timer) {
-      batch.timer = setTimeout(() => this.sealBatch(roomId), COLLECTION_TIMEOUT_MS);
+      batch.timer = setTimeout(() => {
+        this.sealBatch(roomId).catch((err) =>
+          console.error(`[ChunkTranscription] Timer seal failed for room ${roomId}:`, err)
+        );
+      }, COLLECTION_TIMEOUT_MS);
     }
   }
 
-  private sealBatch(roomId: string): void {
+  // Seal whatever has accumulated and enqueue it for transcription.
+  private async sealBatch(roomId: string): Promise<void> {
     const batch = this.batches.get(roomId);
     if (!batch || batch.chunks.length === 0) return;
 
@@ -77,199 +81,41 @@ class ChunkTranscriptionService {
       batch.timer = null;
     }
 
-    const sealed = { ...batch, chunks: [...batch.chunks] };
+    const chunks = [...batch.chunks];
     const batchIndex = batch.batchIndex;
+    const isFinal = batch.isFinal;
+    const meetingId = batch.meetingId;
 
     batch.chunks = [];
     batch.batchIndex++;
     batch.isFinal = false;
 
-    if (sealed.chunks.length === 0) return;
-
-    const key = `${roomId}:${batchIndex}`;
-    const promise = this.processBatch(roomId, sealed.meetingId, sealed.chunks, batchIndex, sealed.isFinal)
-      .catch((err) => console.error(`[ChunkTranscription] Batch ${batchIndex} failed for room ${roomId}:`, err))
-      .finally(() => this.processing.delete(key));
-
-    this.processing.set(key, promise);
-  }
-
-  private async processBatch(
-    roomId: string,
-    meetingId: string,
-    chunks: ChunkEntry[],
-    batchIndex: number,
-    isFinal: boolean
-  ): Promise<void> {
-    const existing = await Transcript.findOne({ meetingId });
-    if (existing && existing.lastProcessedBatch >= batchIndex) {
-      console.log(`[ChunkTranscription] Batch ${batchIndex} already processed for room ${roomId}, skipping`);
-      return;
-    }
-
-    const webmPaths = chunks.map((c) => c.webmPath);
-    const batchStartMs = Math.min(...chunks.map((c) => c.chunkStartMs));
     const roomDir = recordingService.getUploadDir(roomId);
 
-    let wavPath: string;
-    try {
-      wavPath = await this.mergeToWav(webmPaths, roomDir ?? path.dirname(webmPaths[0]), batchIndex);
-    } catch (err) {
-      console.error(`[ChunkTranscription] FFmpeg failed for batch ${batchIndex}:`, err);
-      if (isFinal) await notifyTranscriptStatus(meetingId, "failed");
-      return;
-    }
-
-    try {
-      const { segments, language } = await this.transcribeWav(wavPath, meetingId, batchStartMs);
-
-      const recording = await Recording.findOne({ meetingId });
-      if (!recording) {
-        console.error(`[ChunkTranscription] No recording found for meeting ${meetingId}`);
-        return;
-      }
-
-      const updated = await Transcript.findOneAndUpdate(
-        { meetingId },
-        {
-          $setOnInsert: {
-            meetingId,
-            recordingId: recording._id,
-            language,
-          },
-          $push: { segments: { $each: segments } },
-          $set: {
-            lastProcessedBatch: batchIndex,
-            ...(isFinal ? { status: "completed" } : {}),
-          },
-        },
-        { upsert: true, new: true }
-      );
-
-      if (!updated.status || updated.status === "pending") {
-        updated.status = "processing";
-      }
-      updated.fullText = this.buildFullText(updated.segments as ITranscriptSegment[]);
-      await updated.save();
-
-      if (isFinal) {
-        await notifyTranscriptStatus(meetingId, "completed");
-      }
-
-      console.log(
-        `[ChunkTranscription] Batch ${batchIndex} processed for room ${roomId} — ${segments.length} segments (final=${isFinal})`
-      );
-    } catch (err) {
-      console.error(`[ChunkTranscription] Deepgram failed for batch ${batchIndex}:`, err);
-      if (isFinal) {
-        const transcript = await Transcript.findOne({ meetingId });
-        if (transcript) {
-          transcript.status = "failed";
-          await transcript.save();
-        }
-        await notifyTranscriptStatus(meetingId, "failed");
-      }
-    } finally {
-      try { fs.unlinkSync(wavPath); } catch {}
-    }
-  }
-
-  private mergeToWav(webmPaths: string[], outputDir: string, batchIndex: number): Promise<string> {
-    return new Promise((resolve, reject) => {
-      const outputPath = path.join(outputDir, `batch-${batchIndex}.wav`);
-
-      if (webmPaths.length === 1) {
-        const ffmpeg = spawn("ffmpeg", [
-          "-i", webmPaths[0],
-          "-ac", "1", "-ar", "16000", "-y",
-          outputPath,
-        ]);
-        ffmpeg.on("exit", (code) =>
-          code === 0 ? resolve(outputPath) : reject(new Error(`FFmpeg exited with code ${code}`))
-        );
-        ffmpeg.on("error", reject);
-        return;
-      }
-
-      const args: string[] = [];
-      for (const p of webmPaths) {
-        args.push("-i", p);
-      }
-      args.push(
-        "-filter_complex", `amix=inputs=${webmPaths.length}:duration=longest`,
-        "-ac", "1", "-ar", "16000", "-y",
-        outputPath
-      );
-
-      const ffmpeg = spawn("ffmpeg", args);
-      ffmpeg.on("exit", (code) =>
-        code === 0 ? resolve(outputPath) : reject(new Error(`FFmpeg exited with code ${code}`))
-      );
-      ffmpeg.on("error", reject);
-    });
-  }
-
-  private async transcribeWav(
-    wavPath: string,
-    meetingId: string,
-    batchStartMs: number
-  ): Promise<{ segments: ITranscriptSegment[]; language: string }> {
-    const deepgram = new DeepgramClient({
-      apiKey: config.deepgram.apiKey,
-      timeoutInSeconds: 300,
-    });
-    const audioBuffer = fs.readFileSync(wavPath);
-
-    const response = await deepgram.listen.v1.media.transcribeFile(audioBuffer, {
-      model: "nova-2",
-      punctuate: true,
-      utterances: true,
-      smart_format: true,
+    await enqueue("transcribeBatch", {
+      roomId,
+      meetingId,
+      batchIndex,
+      isFinal,
+      batchStartMs: Math.min(...chunks.map((c) => c.chunkStartMs)),
+      webmPaths: chunks.map((c) => c.webmPath),
+      roomDir: roomDir ?? "",
     });
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const result = response as any;
-    const utterances = (result?.results?.utterances ?? []) as Array<{
-      transcript: string;
-      start: number;
-      end: number;
-      confidence: number;
-    }>;
-    const channels = result?.results?.channels as Array<Record<string, unknown>> | undefined;
-    const language = (channels?.[0]?.detected_language as string) ?? "en";
-
-    const segments = utterances.map((u) => ({
-      text: u.transcript,
-      startMs: Math.round(u.start * 1000) + batchStartMs,
-      endMs: Math.round(u.end * 1000) + batchStartMs,
-      confidence: u.confidence,
-    }));
-
-    return { segments, language };
+    console.log(
+      `[ChunkTranscription] Sealed batch ${batchIndex} for room ${roomId} → queued (${chunks.length} chunk(s), final=${isFinal})`
+    );
   }
 
-  private buildFullText(segments: ITranscriptSegment[]): string {
-    return segments.map((s) => s.text).join(" ");
-  }
-
-  async waitForRoom(roomId: string): Promise<void> {
-    const promises: Promise<void>[] = [];
-    for (const [key, promise] of this.processing.entries()) {
-      if (key.startsWith(`${roomId}:`)) {
-        promises.push(promise);
-      }
-    }
-    if (promises.length > 0) {
-      console.log(`[ChunkTranscription] Waiting for ${promises.length} in-flight batch(es) for room ${roomId}`);
-      await Promise.all(promises);
-    }
-
+  // Called when a meeting ends. Seals any leftover accumulation as the final
+  // batch (so expectedBatchCount gets set even if the client never sent an
+  // explicit final chunk), then drops the room's in-memory state.
+  async flushRoom(roomId: string): Promise<void> {
     const batch = this.batches.get(roomId);
     if (batch && batch.chunks.length > 0) {
-      this.sealBatch(roomId);
-      await this.waitForRoom(roomId);
+      batch.isFinal = true;
+      await this.sealBatch(roomId);
     }
-
     this.batches.delete(roomId);
   }
 }

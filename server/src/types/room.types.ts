@@ -35,6 +35,9 @@ export interface Room {
   pendingRequests: Map<string, PendingJoinRequest>;
   waitingSockets: Set<string>;
   approvedSockets: Set<string>;
+  // Approval persisted by userId so a participant who refreshes (new
+  // socket.id) rejoins directly instead of being sent back to the lobby.
+  approvedUserIds: Set<string>;
   createdAt: Date;
   router: Router | null;
   peerMedia: Map<string, PeerMedia>;

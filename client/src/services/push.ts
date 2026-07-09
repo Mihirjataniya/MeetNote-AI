@@ -11,11 +11,14 @@ function authHeaders(extra: HeadersInit = {}): HeadersInit {
   };
 }
 
-function urlBase64ToUint8Array(base64String: string): Uint8Array {
+// Return a Uint8Array explicitly backed by an ArrayBuffer (not ArrayBufferLike)
+// so it satisfies `applicationServerKey: BufferSource` under TS 5.7+ lib.dom,
+// which rejects the SharedArrayBuffer-possible default backing.
+function urlBase64ToUint8Array(base64String: string): Uint8Array<ArrayBuffer> {
   const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
   const base64 = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/");
   const raw = window.atob(base64);
-  const out = new Uint8Array(raw.length);
+  const out = new Uint8Array(new ArrayBuffer(raw.length));
   for (let i = 0; i < raw.length; i++) out[i] = raw.charCodeAt(i);
   return out;
 }

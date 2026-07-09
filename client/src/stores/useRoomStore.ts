@@ -14,6 +14,32 @@ import type {
   JoinDeniedPayload,
 } from "../types/index";
 
+// Remembers which room this tab is actively in, so a refresh can rejoin
+// directly (the server holds the membership for a short grace window) instead
+// of bouncing the user back to the lobby.
+const ACTIVE_ROOM_KEY = "meetnote:activeRoom";
+export const getActiveRoomSession = (): string | null => {
+  try {
+    return sessionStorage.getItem(ACTIVE_ROOM_KEY);
+  } catch {
+    return null;
+  }
+};
+const setActiveRoomSession = (roomId: string): void => {
+  try {
+    sessionStorage.setItem(ACTIVE_ROOM_KEY, roomId);
+  } catch {
+    /* ignore */
+  }
+};
+const clearActiveRoomSession = (): void => {
+  try {
+    sessionStorage.removeItem(ACTIVE_ROOM_KEY);
+  } catch {
+    /* ignore */
+  }
+};
+
 export type RequestState =
   | "idle"
   | "waiting-for-host"
@@ -80,6 +106,7 @@ export const useRoomStore = create<RoomStore>((set, get) => ({
         return;
       }
       const res = response as RoomCreatedPayload;
+      setActiveRoomSession(res.roomId);
       set({
         roomId: res.roomId,
         meetingId: res.meetingId,
@@ -105,6 +132,7 @@ export const useRoomStore = create<RoomStore>((set, get) => ({
           return;
         }
         const res = response as RoomCreatedPayload;
+        setActiveRoomSession(res.roomId);
         set({
           roomId: res.roomId,
           meetingId: res.meetingId,
@@ -171,6 +199,7 @@ export const useRoomStore = create<RoomStore>((set, get) => ({
     if (roomId && socket) {
       socket.emit("leave-room", { roomId });
     }
+    clearActiveRoomSession();
     set({
       roomId: null,
       participants: [],

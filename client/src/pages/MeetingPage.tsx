@@ -1,6 +1,7 @@
 import { useEffect, useRef, useCallback, useState } from "react";
 import { useParams, useNavigate, useSearchParams, useLocation, Link } from "react-router-dom";
-import { useRoomStore } from "../stores/useRoomStore";
+import { useRoomStore, getActiveRoomSession } from "../stores/useRoomStore";
+import { invalidateMeetings } from "../queries/useMeetingsQuery";
 import { useSocketStore } from "../stores/useSocketStore";
 import { useMediasoup } from "../hooks/useMediasoup";
 import { useRecorder } from "../hooks/useRecorder";
@@ -42,6 +43,7 @@ function MeetingContent() {
     localStream,
     remoteStreams,
     remoteScreenStreams,
+    remoteMediaState,
     screenStream,
     startProducing,
     muteTrack,
@@ -55,11 +57,40 @@ function MeetingContent() {
   const flushIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const lobbyJoinTriggered = useRef(false);
   const initialDevicePrefsApplied = useRef(false);
+  const autoRejoinTried = useRef(false);
 
   // Set up peer-joined/peer-left/lobby listeners
   useEffect(() => {
     return useRoomStore.getState().setupSocketListeners();
   }, [socket]);
+
+  // Auto-rejoin after a refresh: if this tab was already in this room, skip the
+  // lobby and rejoin directly. The server keeps membership/approval for a short
+  // grace window, so this lands the user straight back in the meeting.
+  useEffect(() => {
+    if (autoRejoinTried.current) return;
+    if (isNewRoom || !urlRoomId || roomId) return;
+    if (!connected || !socket) return;
+    if (getActiveRoomSession() !== urlRoomId) return;
+    autoRejoinTried.current = true;
+    joinRoom(urlRoomId, scheduledMeetingId ? { scheduledMeetingId } : undefined);
+  }, [connected, socket, urlRoomId, isNewRoom, roomId, scheduledMeetingId, joinRoom]);
+
+  // If the auto-rejoin failed (grace window elapsed / meeting ended), fall back
+  // to the normal lobby flow instead of showing a hard error. One-shot: only
+  // swallows the auto-rejoin's own error, not later lobby errors.
+  const autoRejoinFellBack = useRef(false);
+  useEffect(() => {
+    if (
+      autoRejoinTried.current &&
+      !autoRejoinFellBack.current &&
+      error &&
+      !roomId
+    ) {
+      autoRejoinFellBack.current = true;
+      setError(null);
+    }
+  }, [error, roomId, setError]);
 
   // Auto-start recording when local stream is available
   useEffect(() => {
@@ -124,11 +155,14 @@ function MeetingContent() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Redirect home after leaving
+  // Redirect home after leaving. Refetch meetings so the just-ended meeting
+  // shows up with its current transcript/notes status (then live socket
+  // events keep it updating without a manual refresh).
   useEffect(() => {
     if (!roomId && meetingId) {
       const timer = setTimeout(() => {
         clearMeetingId();
+        invalidateMeetings();
         navigate("/home");
       }, 3000);
       return () => clearTimeout(timer);
@@ -214,6 +248,7 @@ function MeetingContent() {
         localStream={localStream}
         remoteStreams={remoteStreams}
         remoteScreenStreams={remoteScreenStreams}
+        remoteMediaState={remoteMediaState}
         screenStream={screenStream}
         startMedia={handleStartMedia}
         muteTrack={muteTrack}
@@ -239,6 +274,7 @@ function MeetingContent() {
           <button
             onClick={() => {
               clearMeetingId();
+              invalidateMeetings();
               navigate("/home");
             }}
             className="mt-5 inline-flex items-center gap-2 h-9 px-4 rounded-lg bg-white/[0.08] text-white/70 text-[13px] font-medium hover:bg-white/[0.12] transition-colors"

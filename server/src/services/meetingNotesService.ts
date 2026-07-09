@@ -25,6 +25,9 @@ class MeetingNotesService {
 
     transcript.notesStatus = "generating";
     await transcript.save();
+    // Push a live "generating" status so the dashboard shows progress
+    // immediately after the user leaves, without a manual refresh.
+    await notifyNotesStatus(meetingId, "generating");
 
     try {
       const meeting = await Meeting.findById(meetingId)

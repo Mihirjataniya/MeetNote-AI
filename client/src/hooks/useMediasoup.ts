@@ -10,6 +10,7 @@ import type {
   ConsumedResponse,
   NewProducerPayload,
   ProducerClosedPayload,
+  ProducerPausedPayload,
   PeerLeftPayload,
   ExistingProducersResponse,
 } from "../types/index";
@@ -20,11 +21,20 @@ interface PendingProducer {
   appData?: Record<string, unknown>;
 }
 
+// Mute state of a remote peer's camera producer, keyed by producerSocketId in
+// `remoteMediaState`. Driven by the "producer-paused" broadcast so tiles can
+// show a muted-mic badge / camera-off avatar. Absent entry = nothing muted.
+export interface PeerMediaState {
+  audioMuted: boolean;
+  videoMuted: boolean;
+}
+
 export function useMediasoup(socket: TypedSocket | null, roomId: string | null) {
   const [localStream, setLocalStream] = useState<MediaStream | null>(null);
   const [remoteStreams, setRemoteStreams] = useState<Map<string, MediaStream>>(new Map());
   const [remoteScreenStreams, setRemoteScreenStreams] = useState<Map<string, MediaStream>>(new Map());
   const [screenStream, setScreenStream] = useState<MediaStream | null>(null);
+  const [remoteMediaState, setRemoteMediaState] = useState<Map<string, PeerMediaState>>(new Map());
 
   const deviceRef = useRef<Device | null>(null);
   const sendTransportRef = useRef<Transport | null>(null);
@@ -517,7 +527,32 @@ export function useMediasoup(socket: TypedSocket | null, roomId: string | null) 
       }
     };
 
+    const handleProducerPaused = (payload: ProducerPausedPayload) => {
+      // Screen-share producers don't get a mute overlay; ignore them.
+      const source = producerSourceRef.current.get(payload.producerId);
+      if (source === "screen") return;
+      setRemoteMediaState((prev) => {
+        const next = new Map(prev);
+        const cur = next.get(payload.producerSocketId) ?? {
+          audioMuted: false,
+          videoMuted: false,
+        };
+        const updated =
+          payload.kind === "audio"
+            ? { ...cur, audioMuted: payload.paused }
+            : { ...cur, videoMuted: payload.paused };
+        next.set(payload.producerSocketId, updated);
+        return next;
+      });
+    };
+
     const handlePeerLeft = (payload: PeerLeftPayload) => {
+      setRemoteMediaState((prev) => {
+        if (!prev.has(payload.socketId)) return prev;
+        const next = new Map(prev);
+        next.delete(payload.socketId);
+        return next;
+      });
       for (const [id, consumer] of consumersRef.current) {
         const camStream = remoteStreamsRef.current.get(payload.socketId);
         const scrStream = remoteScreenStreamsRef.current.get(payload.socketId);
@@ -539,11 +574,13 @@ export function useMediasoup(socket: TypedSocket | null, roomId: string | null) 
 
     s.on("new-producer", handleNewProducer);
     s.on("producer-closed", handleProducerClosed);
+    s.on("producer-paused", handleProducerPaused);
     s.on("peer-left", handlePeerLeft);
 
     return () => {
       s.off("new-producer", handleNewProducer);
       s.off("producer-closed", handleProducerClosed);
+      s.off("producer-paused", handleProducerPaused);
       s.off("peer-left", handlePeerLeft);
     };
   }, [roomId, consumeProducer, updateRemoteStreams]);
@@ -552,6 +589,7 @@ export function useMediasoup(socket: TypedSocket | null, roomId: string | null) 
     localStream,
     remoteStreams,
     remoteScreenStreams,
+    remoteMediaState,
     screenStream,
     startProducing,
     muteTrack,

@@ -26,6 +26,7 @@ class RoomService {
       pendingRequests: new Map(),
       waitingSockets: new Set(),
       approvedSockets: new Set(),
+      approvedUserIds: new Set(),
       createdAt: new Date(),
       router: null,
       peerMedia: new Map(),
@@ -127,6 +128,18 @@ class RoomService {
   isApproved(roomId: string, socketId: string): boolean {
     const room = this.rooms.get(roomId);
     return !!room && room.approvedSockets.has(socketId);
+  }
+
+  // userId-scoped approval — survives socket reconnects (refresh).
+  approveUser(roomId: string, userId: string): void {
+    const room = this.rooms.get(roomId);
+    if (!room) return;
+    room.approvedUserIds.add(userId);
+  }
+
+  isUserApproved(roomId: string, userId: string): boolean {
+    const room = this.rooms.get(roomId);
+    return !!room && room.approvedUserIds.has(userId);
   }
 
   getParticipants(roomId: string): ParticipantInfo[] {

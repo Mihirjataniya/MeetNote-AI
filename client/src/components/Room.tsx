@@ -7,11 +7,13 @@ import { RemoteVideo } from "./RemoteVideo";
 import { Icon } from "./shell/Icon";
 import { Avatar } from "./shell/Avatar";
 import { ChatPanel } from "./ChatPanel";
+import type { PeerMediaState } from "../hooks/useMediasoup";
 
 export interface RoomProps {
   localStream: MediaStream | null;
   remoteStreams: Map<string, MediaStream>;
   remoteScreenStreams: Map<string, MediaStream>;
+  remoteMediaState: Map<string, PeerMediaState>;
   screenStream: MediaStream | null;
   startMedia: () => void;
   muteTrack: (kind: "audio" | "video", muted: boolean) => void;
@@ -40,6 +42,7 @@ export function Room({
   localStream,
   remoteStreams,
   remoteScreenStreams,
+  remoteMediaState,
   screenStream,
   startMedia,
   muteTrack,
@@ -59,8 +62,14 @@ export function Room({
   const socketId = socket?.id ?? null;
   const pendingCount = isHost ? pendingRequests.length : 0;
 
-  const [micOn, setMicOn] = useState(true);
-  const [camOn, setCamOn] = useState(true);
+  // Seed the control state from the device choices made in the lobby so the
+  // UI (and the LocalVideo avatar/black-frame swap) matches the actual track
+  // enabled-state that MeetingPage applies. Starting these at `true`
+  // unconditionally left a muted-in-lobby user showing a stuck black tile.
+  const preferredMicOn = useRoomStore((s) => s.preferredMicOn);
+  const preferredCamOn = useRoomStore((s) => s.preferredCamOn);
+  const [micOn, setMicOn] = useState(preferredMicOn);
+  const [camOn, setCamOn] = useState(preferredCamOn);
 
   const handleToggleCam = useCallback(() => {
     if (!localStream) {
@@ -310,13 +319,18 @@ export function Room({
                   displayName={user?.displayName ?? "You"}
                 />
               )}
-              {Array.from(remoteStreams.entries()).map(([peerId, stream]) => (
-                <RemoteVideo
-                  key={peerId}
-                  stream={stream}
-                  displayName={peerLookup.get(peerId) ?? peerId.slice(0, 8)}
-                />
-              ))}
+              {Array.from(remoteStreams.entries()).map(([peerId, stream]) => {
+                const ms = remoteMediaState.get(peerId);
+                return (
+                  <RemoteVideo
+                    key={peerId}
+                    stream={stream}
+                    displayName={peerLookup.get(peerId) ?? peerId.slice(0, 8)}
+                    audioMuted={ms?.audioMuted ?? false}
+                    videoMuted={ms?.videoMuted ?? false}
+                  />
+                );
+              })}
             </div>
           ) : (
             /* ── Empty state ── */

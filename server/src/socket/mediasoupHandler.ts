@@ -350,6 +350,15 @@ export function registerMediasoupHandlers(io: TypedServer): void {
         const producer = media?.producers.get(payload.producerId);
         if (producer && !producer.closed && !producer.paused) {
           await producer.pause();
+          // Tell other peers so they can show a muted-mic / camera-off
+          // indicator on this participant's tile.
+          socket.to(payload.roomId).emit("producer-paused", {
+            roomId: payload.roomId,
+            producerId: payload.producerId,
+            producerSocketId: socket.id,
+            kind: producer.kind,
+            paused: true,
+          });
         }
         callback({ paused: true });
       } catch {
@@ -368,6 +377,13 @@ export function registerMediasoupHandlers(io: TypedServer): void {
         const producer = media?.producers.get(payload.producerId);
         if (producer && !producer.closed && producer.paused) {
           await producer.resume();
+          socket.to(payload.roomId).emit("producer-paused", {
+            roomId: payload.roomId,
+            producerId: payload.producerId,
+            producerSocketId: socket.id,
+            kind: producer.kind,
+            paused: false,
+          });
         }
         callback({ resumed: true });
       } catch {

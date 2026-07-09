@@ -188,6 +188,18 @@ export interface ProducerClosedPayload {
   producerSocketId: string;
 }
 
+// Broadcast when a peer pauses/resumes a producer (mic mute, camera off) so
+// other clients can render a muted-mic badge / camera-off avatar. The stream
+// stops carrying media on pause, but without this signal peers only see
+// silence / a frozen last frame with no UI indication of intent.
+export interface ProducerPausedPayload {
+  roomId: string;
+  producerId: string;
+  producerSocketId: string;
+  kind: MediaKind;
+  paused: boolean;
+}
+
 // --- Chat payloads ---
 
 export interface SendMessagePayload {
@@ -207,12 +219,12 @@ export interface ChatMessagePayload {
 
 export interface TranscriptReadyPayload {
   meetingId: string;
-  status: "completed" | "failed";
+  status: "processing" | "completed" | "failed";
 }
 
 export interface NotesReadyPayload {
   meetingId: string;
-  status: "completed" | "failed";
+  status: "generating" | "completed" | "failed";
 }
 
 export type MeetingStateChangeKind =
@@ -310,6 +322,7 @@ export interface ServerToClientEvents {
   "peer-left": (payload: PeerLeftPayload) => void;
   "new-producer": (payload: NewProducerPayload) => void;
   "producer-closed": (payload: ProducerClosedPayload) => void;
+  "producer-paused": (payload: ProducerPausedPayload) => void;
   "transcript-ready": (payload: TranscriptReadyPayload) => void;
   "notes-ready": (payload: NotesReadyPayload) => void;
   "chat-message": (payload: ChatMessagePayload) => void;

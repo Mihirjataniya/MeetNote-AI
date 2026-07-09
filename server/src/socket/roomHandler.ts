@@ -86,6 +86,44 @@ function promoteWaitingToPending(io: TypedServer, roomId: string): void {
   }
 }
 
+// ── Grace window for disconnects ──
+// A socket disconnect (refresh, transient network drop) should NOT immediately
+// end the meeting. We defer the end-of-meeting work; if the same user (or
+// anyone) rejoins within the window, the cleanup is cancelled and the meeting
+// continues seamlessly. Only an explicit "leave-room" ends immediately.
+const GRACE_MS = 30_000;
+const cleanupTimers = new Map<string, ReturnType<typeof setTimeout>>();
+
+function cancelRoomCleanup(roomId: string): void {
+  const t = cleanupTimers.get(roomId);
+  if (t) {
+    clearTimeout(t);
+    cleanupTimers.delete(roomId);
+  }
+}
+
+function scheduleRoomCleanup(roomId: string, meetingId: string | null): void {
+  if (cleanupTimers.has(roomId)) return;
+  const timer = setTimeout(async () => {
+    cleanupTimers.delete(roomId);
+    const room = roomService.getRoom(roomId);
+    // Someone rejoined during the grace window — abort the teardown.
+    if (room && room.participants.size > 0) return;
+
+    if (meetingId) {
+      const recordingResult = recordingService.stopRecording(roomId);
+      await meetingService.endMeeting(meetingId).catch((err) =>
+        console.error("[Meeting] endMeeting failed:", err)
+      );
+      pipelineService
+        .run(roomId, meetingId, recordingResult)
+        .catch((err) => console.error("[Pipeline] Failed:", err));
+    }
+    roomService.deleteRoom(roomId);
+  }, GRACE_MS);
+  cleanupTimers.set(roomId, timer);
+}
+
 async function handleScheduledJoin(
   io: TypedServer,
   socket: TypedSocket,
@@ -128,10 +166,17 @@ async function handleScheduledJoin(
   }
 
   const isHostUser = meeting.createdBy.toString() === userId;
-  if (!isHostUser && !roomService.isApproved(meeting.roomId, socket.id)) {
+  if (
+    !isHostUser &&
+    !roomService.isApproved(meeting.roomId, socket.id) &&
+    !roomService.isUserApproved(meeting.roomId, userId)
+  ) {
     callback({ message: "Approval required to join this meeting" });
     return;
   }
+
+  // (Re)joining — abort any pending grace teardown for this room.
+  cancelRoomCleanup(meeting.roomId);
 
   let room = roomService.getRoom(meeting.roomId);
   const fresh = !room;
@@ -183,6 +228,7 @@ async function handleScheduledJoin(
 
   if (!isHostUser) {
     roomService.consumeApproval(meeting.roomId, socket.id);
+    roomService.approveUser(meeting.roomId, userId);
   }
 
   meetingService.addParticipant(meeting._id.toString(), userId, displayName);
@@ -295,10 +341,17 @@ export function registerRoomHandlers(io: TypedServer): void {
         }
 
         const isHostUser = room.hostUserId === socket.data.userId;
-        if (!isHostUser && !roomService.isApproved(payload.roomId, socket.id)) {
+        if (
+          !isHostUser &&
+          !roomService.isApproved(payload.roomId, socket.id) &&
+          !roomService.isUserApproved(payload.roomId, socket.data.userId)
+        ) {
           callback({ message: "Approval required to join this meeting" });
           return;
         }
+
+        // A participant is (re)joining — abort any pending grace teardown.
+        cancelRoomCleanup(payload.roomId);
 
         if (room.participants.has(socket.id)) {
           callback({
@@ -327,6 +380,8 @@ export function registerRoomHandlers(io: TypedServer): void {
 
         if (!isHostUser) {
           roomService.consumeApproval(payload.roomId, socket.id);
+          // Keep userId-level approval so future reconnects skip the lobby.
+          roomService.approveUser(payload.roomId, socket.data.userId);
         }
 
         if (room.meetingId) {
@@ -478,6 +533,9 @@ export function registerRoomHandlers(io: TypedServer): void {
         }
 
         roomService.approveSocket(payload.roomId, payload.socketId);
+        // Remember the approval by userId so a refresh (new socket) rejoins
+        // directly instead of having to request again.
+        roomService.approveUser(payload.roomId, removed.userId);
         notifyHostsOfCancellation(io, payload.roomId, payload.socketId);
         io.to(payload.socketId).emit("join-approved", { roomId: payload.roomId });
         callback({ approved: true });
@@ -522,6 +580,9 @@ export function registerRoomHandlers(io: TypedServer): void {
 
     socket.on("leave-room", async (payload) => {
       if (!payload?.roomId) return;
+
+      // Explicit leave overrides any in-flight grace teardown.
+      cancelRoomCleanup(payload.roomId);
 
       const room = roomService.getRoom(payload.roomId);
       const meetingId = room?.meetingId;
@@ -618,11 +679,6 @@ export function registerRoomHandlers(io: TypedServer): void {
         const isLastParticipant = room.participants.size === 1
           && room.participants.has(socket.id);
 
-        let recordingResult = null;
-        if (isLastParticipant && meetingId) {
-          recordingResult = recordingService.stopRecording(roomId);
-        }
-
         let removed;
         try {
           removed = roomService.removeParticipant(roomId, socket.id);
@@ -634,13 +690,12 @@ export function registerRoomHandlers(io: TypedServer): void {
         }
 
         if (removed) {
+          // Unlike "leave-room", a disconnect is treated as a possible refresh
+          // / transient drop. We defer the meeting teardown with a grace
+          // window so a reconnecting user (especially a solo host) doesn't end
+          // the meeting and trigger the transcription pipeline prematurely.
           if (meetingId && isLastParticipant) {
-            await meetingService.endMeeting(meetingId).catch((err) =>
-              console.error("[Meeting] endMeeting failed:", err)
-            );
-            pipelineService
-              .run(roomId, meetingId, recordingResult)
-              .catch((err) => console.error("[Pipeline] Failed:", err));
+            scheduleRoomCleanup(roomId, meetingId);
           } else if (meetingId) {
             meetingService
               .removeParticipant(meetingId, socket.data.userId)

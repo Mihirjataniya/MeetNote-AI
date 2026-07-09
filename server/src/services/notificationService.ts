@@ -113,7 +113,7 @@ export async function notifyTranscriptStatus(
 
 export async function notifyNotesStatus(
   meetingId: string,
-  status: "completed" | "failed"
+  status: "generating" | "completed" | "failed"
 ): Promise<void> {
   try {
     const meeting = await Meeting.findById(meetingId)
@@ -124,6 +124,8 @@ export async function notifyNotesStatus(
     const title = meeting.title ?? "Untitled meeting";
     const isOk = status === "completed";
 
+    // Live cache-update event — fires for every state, including the
+    // intermediate "generating" so the dashboard shows progress in real time.
     const io = getIO();
     for (const p of meeting.participants) {
       io.to(`user:${p.userId.toString()}`).emit("notes-ready", {
@@ -131,6 +133,9 @@ export async function notifyNotesStatus(
         status,
       });
     }
+
+    // Only the terminal states create a persistent bell notification.
+    if (status === "generating") return;
 
     await createBulk(
       meeting.participants.map((p) => p.userId),

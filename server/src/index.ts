@@ -14,8 +14,14 @@ import dns from "node:dns/promises";
 
 async function main() {
   const app = express();
-  dns.setServers(["1.1.1.1"]);
-  app.use(cors());
+  // Keep the OS resolver first (works for AWS/SQS, Cloudinary, etc.), with
+  // 1.1.1.1 as a fallback for environments whose system DNS is a broken stub
+  // (e.g. systemd-resolved 127.0.0.53). Forcing 1.1.1.1 outright breaks hosts
+  // when the network blocks outbound DNS to public resolvers.
+  dns.setServers([...new Set([...dns.getServers(), "1.1.1.1"])]);
+  // Honor CORS_ORIGIN (same source socket.io uses) so the HTTP API isn't left
+  // wildcard-open in production. Defaults to "*" for local dev.
+  app.use(cors({ origin: config.cors.origin }));
   app.use(express.json());
 
   app.use("/api", apiRoutes);

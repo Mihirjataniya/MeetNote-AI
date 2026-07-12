@@ -71,7 +71,7 @@ function PinnedItem({
       type="button"
       onClick={handleClick}
       disabled={busy}
-      title={`${meeting.title || "Untitled meeting"} — ${actionLabel}`}
+      title={`${meeting.title || "Untitled meeting"} · ${actionLabel}`}
       className="flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-[13.5px] font-medium text-secondary hover:bg-hover hover:text-foreground transition-all duration-[120ms] disabled:opacity-60 disabled:cursor-not-allowed text-left w-full"
     >
       <Icon
@@ -129,7 +129,7 @@ function SidebarContent() {
           <span className="w-[22px] h-[22px] rounded-[6px] bg-accent text-accent-foreground inline-flex items-center justify-center font-display text-[13px] font-bold shrink-0">
             M
           </span>
-          {!collapsed && <span>MeetNote</span>}
+          {!collapsed && <span>MeetNote Ai</span>}
         </span>
         <button
           onClick={toggleCollapsed}

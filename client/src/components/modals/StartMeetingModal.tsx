@@ -108,7 +108,7 @@ export function StartMeetingModal({ open, onClose }: StartMeetingModalProps) {
               </h3>
               <p className="text-[13px] text-secondary mt-1">
                 {tab === "start"
-                  ? "MeetNote will join, record and write the notes."
+                  ? "MeetNote Ai will join, record and write the notes."
                   : "Enter a room ID shared by the meeting host."}
               </p>
             </div>
@@ -146,7 +146,7 @@ export function StartMeetingModal({ open, onClose }: StartMeetingModalProps) {
                     rows={3}
                     value={desc}
                     onChange={(e) => setDesc(e.target.value)}
-                    placeholder="A short context for the AI summary — agenda, goal, attendees' background..."
+                    placeholder="A short context for the AI summary: agenda, goal, attendees' background..."
                   />
                 </div>
 
@@ -184,7 +184,7 @@ export function StartMeetingModal({ open, onClose }: StartMeetingModalProps) {
                 <div className="flex items-center gap-2.5 px-3.5 py-3 bg-background border border-border rounded-[10px] text-[12px] text-secondary leading-relaxed">
                   <Icon name="users" size={14} className="text-tertiary shrink-0" />
                   <span>
-                    Ask the meeting host for the room ID. Once you join, MeetNote
+                    Ask the meeting host for the room ID. Once you join, MeetNote Ai
                     will record and generate notes automatically.
                   </span>
                 </div>

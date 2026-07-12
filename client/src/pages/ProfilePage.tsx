@@ -4,7 +4,7 @@ import { Avatar } from "../components/shell/Avatar";
 import { Icon } from "../components/shell/Icon";
 
 function fmtJoinedDate(iso?: string): string {
-  if (!iso) return "—";
+  if (!iso) return "–";
   return new Date(iso).toLocaleDateString(undefined, {
     month: "long",
     day: "numeric",

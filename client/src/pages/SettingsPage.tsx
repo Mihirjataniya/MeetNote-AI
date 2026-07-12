@@ -443,7 +443,7 @@ function BrowserPushCard() {
           </div>
           <div className="text-[12px] sm:text-[12.5px] text-tertiary mt-0.5">
             Get notified about meeting invites, notes, and missed join requests
-            even when MeetNote is in the background.
+            even when MeetNote Ai is in the background.
           </div>
         </div>
         <button

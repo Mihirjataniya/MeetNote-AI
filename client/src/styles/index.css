@@ -29,7 +29,7 @@
   --color-error: var(--error);
 
   --font-sans: "Inter", system-ui, -apple-system, sans-serif;
-  --font-display: "Inter Tight", system-ui, sans-serif;
+  --font-display: "Space Grotesk", "Inter Tight", system-ui, sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, monospace;
   --font-serif: "Georgia", serif;
 
@@ -191,4 +191,254 @@
   ::view-transition-new(root) {
     animation: none;
   }
+}
+
+/* ================================================================== *
+ * Landing page — micro-interactions
+ * Everything here is gated behind (prefers-reduced-motion: no-preference)
+ * so a user who opts out gets a fully static, fully-visible page.
+ * ================================================================== */
+
+/* Scroll-reveal: elements start hidden, fade + rise into place when the
+   IntersectionObserver in LandingPage adds .is-visible. Always on. */
+[data-reveal] {
+  opacity: 0;
+  transform: translateY(22px);
+  transition:
+    opacity 0.7s cubic-bezier(0.2, 0.7, 0.3, 1),
+    transform 0.7s cubic-bezier(0.2, 0.7, 0.3, 1);
+  will-change: opacity, transform;
+}
+[data-reveal].is-visible {
+  opacity: 1;
+  transform: none;
+}
+
+/* Hover shine — a diagonal highlight sweeps across the element once. */
+.shine {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+}
+.shine::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: -160%;
+  width: 55%;
+  height: 100%;
+  transform: skewX(-18deg);
+  background: linear-gradient(
+    100deg,
+    transparent,
+    rgba(255, 255, 255, 0.38),
+    transparent
+  );
+  pointer-events: none;
+  z-index: 1;
+}
+/* Dark variant for light-colored surfaces (white buttons on the CTA band). */
+.shine-dark::after {
+  background: linear-gradient(
+    100deg,
+    transparent,
+    rgba(0, 0, 0, 0.12),
+    transparent
+  );
+}
+.shine:hover::after {
+  animation: shine-sweep 0.9s ease;
+}
+@keyframes shine-sweep {
+  to {
+    left: 160%;
+  }
+}
+
+/* Pulsing halo for the "Notes generated" AI indicator. */
+@media (prefers-reduced-motion: no-preference) {
+  .ai-glow {
+    animation: ai-pulse 2.6s ease-in-out infinite;
+  }
+}
+@keyframes ai-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(120, 120, 120, 0);
+    opacity: 0.8;
+  }
+  50% {
+    box-shadow: 0 0 0 5px rgba(120, 120, 120, 0.14);
+    opacity: 1;
+  }
+}
+
+/* Gentle vertical float for the exported-PDF sheet (keeps its -3deg tilt). */
+@media (prefers-reduced-motion: no-preference) {
+  .float-pdf {
+    animation: float-pdf 6s ease-in-out infinite;
+  }
+}
+@keyframes float-pdf {
+  0%,
+  100% {
+    transform: rotate(-3deg) translateY(0);
+  }
+  50% {
+    transform: rotate(-3deg) translateY(-7px);
+  }
+}
+
+/* Card hover lift — used on feature cards. */
+.hover-lift {
+  transition:
+    transform 0.28s cubic-bezier(0.2, 0.7, 0.3, 1),
+    box-shadow 0.28s cubic-bezier(0.2, 0.7, 0.3, 1),
+    border-color 0.28s ease;
+}
+.hover-lift:hover {
+  transform: translateY(-4px);
+  box-shadow: var(--shadow-lg);
+  border-color: var(--border-focused);
+}
+
+/* Speaker-share bars: grow from 0 to their target width once revealed. */
+.bar-fill {
+  width: 0;
+  transition: width 1.1s cubic-bezier(0.2, 0.7, 0.3, 1);
+  transition-delay: 0.15s;
+}
+[data-reveal].is-visible .bar-fill {
+  width: var(--w);
+}
+
+/* Drifting radial sheen inside the dark CTA band. */
+.cta-sheen {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+}
+.cta-sheen::before {
+  content: "";
+  position: absolute;
+  inset: -60%;
+  background: radial-gradient(
+    circle at 28% 18%,
+    rgba(255, 255, 255, 0.1),
+    transparent 42%
+  );
+  pointer-events: none;
+  z-index: 0;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .cta-sheen::before {
+    animation: sheen-pan 9s ease-in-out infinite;
+  }
+}
+@keyframes sheen-pan {
+  0%,
+  100% {
+    transform: translate(0, 0);
+  }
+  50% {
+    transform: translate(18%, 14%);
+  }
+}
+.cta-sheen > * {
+  position: relative;
+  z-index: 1;
+}
+
+/* Soft aurora blob behind the hero headline. */
+.hero-aura {
+  position: absolute;
+  pointer-events: none;
+  border-radius: 999px;
+  filter: blur(60px);
+  opacity: 0.5;
+  background: radial-gradient(
+    circle,
+    color-mix(in oklab, var(--foreground) 12%, transparent),
+    transparent 70%
+  );
+}
+@media (prefers-reduced-motion: no-preference) {
+  .hero-aura {
+    animation: aura-drift 14s ease-in-out infinite;
+  }
+}
+@keyframes aura-drift {
+  0%,
+  100% {
+    transform: translate(0, 0) scale(1);
+  }
+  50% {
+    transform: translate(6%, -5%) scale(1.08);
+  }
+}
+
+/* Infinite marquee for the logo wall (paused on hover). */
+.marquee-mask {
+  -webkit-mask: linear-gradient(
+    90deg,
+    transparent,
+    #000 12%,
+    #000 88%,
+    transparent
+  );
+  mask: linear-gradient(90deg, transparent, #000 12%, #000 88%, transparent);
+}
+.marquee-track {
+  display: flex;
+  width: max-content;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .marquee-track {
+    animation: marquee 30s linear infinite;
+  }
+  .marquee-mask:hover .marquee-track {
+    animation-play-state: paused;
+  }
+}
+@keyframes marquee {
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+/* Feature cards — raised, tactile 3D surface. */
+.feature-card {
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.5) inset,
+    0 12px 24px -10px rgba(0, 0, 0, 0.12),
+    0 34px 50px -24px rgba(0, 0, 0, 0.2);
+}
+.feature-card:hover {
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.5) inset,
+    0 18px 34px -12px rgba(0, 0, 0, 0.16),
+    0 46px 72px -28px rgba(0, 0, 0, 0.28);
+}
+.dark .feature-card {
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.06) inset,
+    0 12px 24px -10px rgba(0, 0, 0, 0.5),
+    0 34px 50px -24px rgba(0, 0, 0, 0.6);
+}
+
+/* Hero "data rays" — flowing dashes along the call → AI → PDF connectors. */
+@keyframes rayflow {
+  from {
+    stroke-dashoffset: 100;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+/* Top-of-page scroll progress bar. */
+.scroll-progress {
+  transform-origin: 0 50%;
+  transform: scaleX(var(--p, 0));
+  transition: transform 0.08s linear;
 }

@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { useAuthStore } from "../stores/useAuthStore";
 
 function Logo() {
@@ -7,7 +8,7 @@ function Logo() {
       <span className="w-[22px] h-[22px] rounded-[6px] bg-accent text-accent-foreground inline-flex items-center justify-center font-display text-[13px] font-bold">
         M
       </span>
-      MeetNote
+      MeetNote Ai
     </span>
   );
 }
@@ -43,7 +44,7 @@ function SidePanel({ side }: { side: "left" | "right" }) {
           From the docs
         </div>
         <p className="mt-4 font-serif text-[22px] xl:text-[26px] leading-[1.35] text-foreground tracking-[-0.01em] italic">
-          "MeetNote is the quietest piece of software I've installed in years. It does its job, and gets out of the way."
+          "MeetNote Ai is the quietest piece of software I've installed in years. It does its job, and gets out of the way."
         </p>
         <div className="mt-5 flex items-center gap-2.5">
           <span className="w-7 h-7 rounded-full bg-[#3A3A38] text-white inline-flex items-center justify-center text-[11px] font-semibold shrink-0">
@@ -84,7 +85,10 @@ export function AuthPage() {
   const login = useAuthStore((s) => s.login);
   const register = useAuthStore((s) => s.register);
   const error = useAuthStore((s) => s.error);
-  const [mode, setMode] = useState<"login" | "register">("login");
+  const [searchParams] = useSearchParams();
+  const [mode, setMode] = useState<"login" | "register">(
+    searchParams.get("mode") === "register" ? "register" : "login",
+  );
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [displayName, setDisplayName] = useState("");
@@ -130,7 +134,7 @@ export function AuthPage() {
             <p className="mt-2 text-[14px] text-secondary">
               {mode === "login"
                 ? "Sign in to pick up where your meetings left off."
-                : "Free for your team. Set up in seconds."}
+                : "Set up your workspace in seconds."}
             </p>
 
             <form onSubmit={handleSubmit} className="mt-7">
@@ -212,7 +216,7 @@ export function AuthPage() {
                     className="accent-accent w-3.5 h-3.5 mt-0.5"
                   />
                   <span>
-                    I agree to MeetNote's{" "}
+                    I agree to MeetNote Ai's{" "}
                     <span className="text-foreground cursor-pointer">Terms</span> and{" "}
                     <span className="text-foreground cursor-pointer">Privacy Policy</span>.
                   </span>
@@ -256,7 +260,7 @@ export function AuthPage() {
         </div>
 
         <div className="flex text-[12px] text-tertiary gap-4">
-          <span>&copy; 2026 MeetNote</span>
+          <span>&copy; 2026 MeetNote Ai</span>
           <span className="ml-auto">Privacy · Terms</span>
         </div>
       </div>

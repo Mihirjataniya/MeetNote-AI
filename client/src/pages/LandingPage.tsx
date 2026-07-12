@@ -1,0 +1,782 @@
+import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
+import { useNavigate } from "react-router-dom";
+import { Avatar, AvatarGroup } from "../components/shell/Avatar";
+import { Icon } from "../components/shell/Icon";
+
+/* ------------------------------------------------------------------ *
+ * Shared primitives — ports of the design's mn-* utility classes onto
+ * the app's Tailwind tokens (see styles/index.css @theme).
+ * ------------------------------------------------------------------ */
+
+type BtnVariant = "primary" | "secondary" | "ghost";
+type BtnSize = "sm" | "base" | "lg";
+
+const BTN_SIZE: Record<BtnSize, string> = {
+  sm: "h-8 px-3 text-[13px] gap-1.5",
+  base: "h-10 px-4 text-[14px] gap-2",
+  lg: "h-11 px-5 text-[15px] gap-2",
+};
+
+const BTN_VARIANT: Record<BtnVariant, string> = {
+  primary:
+    "shine bg-accent text-accent-foreground border border-accent hover:bg-foreground",
+  secondary:
+    "shine shine-dark bg-surface text-foreground border border-border-strong hover:bg-surface-hover",
+  ghost:
+    "bg-transparent text-secondary border border-transparent hover:text-foreground hover:bg-hover",
+};
+
+function Btn({
+  children,
+  variant = "primary",
+  size = "base",
+  className = "",
+  onClick,
+}: {
+  children: ReactNode;
+  variant?: BtnVariant;
+  size?: BtnSize;
+  className?: string;
+  onClick?: () => void;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className={`inline-flex items-center justify-center rounded-[10px] font-medium tracking-tight whitespace-nowrap transition-all duration-150 active:scale-[0.98] ${BTN_SIZE[size]} ${BTN_VARIANT[variant]} ${className}`}
+    >
+      {children}
+    </button>
+  );
+}
+
+function Eyebrow({
+  children,
+  className = "",
+  style,
+}: {
+  children: ReactNode;
+  className?: string;
+  style?: CSSProperties;
+}) {
+  return (
+    <div
+      className={`text-[11px] font-medium uppercase tracking-[0.12em] text-tertiary ${className}`}
+      style={style}
+    >
+      {children}
+    </div>
+  );
+}
+
+function Pill({ children }: { children: ReactNode }) {
+  return (
+    <span className="inline-flex items-center gap-1.5 rounded-full border border-border bg-surface px-2.5 py-1 text-[11px] text-secondary">
+      {children}
+    </span>
+  );
+}
+
+function Divider({ className = "" }: { className?: string }) {
+  return <hr className={`border-none h-px bg-border ${className}`} />;
+}
+
+function Logo({ size = "base" }: { size?: "base" | "lg" }) {
+  const lg = size === "lg";
+  return (
+    <span
+      className={`inline-flex items-center font-semibold tracking-tight text-foreground ${lg ? "gap-2.5 text-[16px]" : "gap-2 text-[15px]"
+        }`}
+    >
+      <span
+        className={`inline-flex items-center justify-center rounded-[6px] bg-accent text-accent-foreground font-display font-bold ${lg ? "w-6 h-6 text-[14px]" : "w-[22px] h-[22px] text-[13px]"
+          }`}
+      >
+        M
+      </span>
+      MeetNote Ai
+    </span>
+  );
+}
+
+/* Horizontal page padding + centered max width, shared by every section. */
+const SHELL = "px-6 md:px-14 mx-auto max-w-[1280px]";
+
+/* Animated "data rays" overlay for the hero graphic. Path coordinates are
+ * tuned to the 1440×595 Hero-Graphic.png: they trace the connectors from the
+ * call (left) into the AI node (centre) and out to the PDF (right). */
+const HERO_RAYS: { d: string; dur: number; delay: number }[] = [
+  { d: "M 588 150 C 668 152, 700 232, 728 262", dur: 2.6, delay: -0.2 },
+  { d: "M 588 185 C 668 187, 700 248, 726 270", dur: 3.1, delay: -1.4 },
+  { d: "M 588 222 C 668 224, 700 262, 724 278", dur: 2.3, delay: -0.8 },
+  { d: "M 588 258 C 670 259, 702 276, 723 286", dur: 2.9, delay: -2.1 },
+  { d: "M 588 292 C 670 292, 700 292, 722 292", dur: 2.4, delay: -1.0 },
+  { d: "M 588 328 C 670 327, 702 308, 723 299", dur: 3.3, delay: -0.5 },
+  { d: "M 588 363 C 668 362, 700 322, 724 307", dur: 2.5, delay: -1.8 },
+  { d: "M 588 399 C 668 397, 700 336, 726 315", dur: 3.0, delay: -0.3 },
+  { d: "M 588 434 C 668 432, 700 352, 728 323", dur: 2.7, delay: -1.2 },
+  { d: "M 872 262 C 940 232, 990 154, 1058 152", dur: 2.8, delay: -0.9 },
+  { d: "M 876 272 C 945 248, 990 198, 1058 196", dur: 2.4, delay: -1.6 },
+  { d: "M 878 282 C 945 264, 995 242, 1058 240", dur: 3.2, delay: -0.4 },
+  { d: "M 880 292 C 940 292, 1000 292, 1058 292", dur: 2.5, delay: -2.0 },
+  { d: "M 878 302 C 945 320, 995 342, 1058 344", dur: 2.9, delay: -0.7 },
+  { d: "M 876 312 C 945 336, 990 390, 1058 392", dur: 2.3, delay: -1.3 },
+  { d: "M 872 322 C 940 352, 990 436, 1058 438", dur: 3.0, delay: -0.1 },
+];
+
+const RAY_DASH = "7 43";
+
+function HeroRays() {
+  const anim = (dur: number, delay: number): CSSProperties => ({
+    strokeDasharray: RAY_DASH,
+    animation: `rayflow ${dur}s linear infinite`,
+    animationDelay: `${delay}s`,
+  });
+  return (
+    <svg
+      viewBox="0 0 1440 595"
+      className="pointer-events-none absolute inset-0 h-full w-full"
+      style={{ overflow: "visible" }}
+      aria-hidden
+    >
+      <g fill="none" strokeLinecap="round">
+        {/* soft glow */}
+        <g stroke="#ffffff" style={{ opacity: 0.5, filter: "blur(4px)" }}>
+          {HERO_RAYS.map((r, i) => (
+            <path key={i} d={r.d} pathLength={100} strokeWidth={6} style={anim(r.dur, r.delay)} />
+          ))}
+        </g>
+        {/* crisp data bits */}
+        <g stroke="#ffffff" strokeWidth={2.2}>
+          {HERO_RAYS.map((r, i) => (
+            <path key={i} d={r.d} pathLength={100} style={anim(r.dur, r.delay)} />
+          ))}
+        </g>
+      </g>
+    </svg>
+  );
+}
+
+/* ------------------------------------------------------------------ *
+ * Sections
+ * ------------------------------------------------------------------ */
+
+function LandingNav() {
+  const nav = useNavigate();
+  return (
+    <div className="sticky top-0 z-20 border-b border-border bg-background/80 backdrop-blur-xl">
+      <div className="mx-auto flex max-w-[1280px] items-center gap-7 px-6 py-3.5 md:px-14">
+        <Logo size="lg" />
+        <div className="flex-1" />
+        <span className="hidden sm:contents">
+          <Btn variant="ghost" size="sm" onClick={() => nav("/signin")}>
+            Sign in
+          </Btn>
+        </span>
+        <Btn variant="primary" size="sm" onClick={() => nav("/signin?mode=register")}>
+          Get MeetNote Ai <Icon name="arrowRight" size={12} />
+        </Btn>
+      </div>
+    </div>
+  );
+}
+
+function Hero() {
+  const nav = useNavigate();
+  return (
+    <section className={`${SHELL} relative pt-16 pb-14 md:pt-[88px] md:pb-16`}>
+      {/* Decorative aurora blobs drifting behind the headline. */}
+      <div className="hero-aura left-[-6%] top-[2%] h-[340px] w-[340px]" aria-hidden />
+      <div
+        className="hero-aura right-[8%] top-[26%] h-[280px] w-[280px]"
+        style={{ animationDelay: "-6s" }}
+        aria-hidden
+      />
+
+      <div className="relative grid items-center gap-10 lg:grid-cols-[minmax(0,420px)_1fr] lg:gap-12">
+        {/* Text column */}
+        <div>
+          <h1
+            className="max-w-[620px] font-display font-semibold text-foreground"
+            style={{
+              fontSize: "clamp(40px, 6vw, 68px)",
+              lineHeight: 1.0,
+              letterSpacing: "-0.035em",
+            }}
+          >
+            Turn conversations into{" "}
+            <em className="font-serif text-[0.96em] font-normal italic">
+              structured
+            </em>{" "}
+            knowledge.
+          </h1>
+
+          <p
+            data-reveal
+            style={{ transitionDelay: "0.08s" }}
+            className="mt-6 max-w-[520px] text-[16px] leading-[1.55] text-secondary md:text-[18px]"
+          >
+            MeetNote Ai captures every meeting, writes the notes you'd write
+            yourself, and files them where your team will actually find them.
+            Calm by design, legible by default, exportable as polished PDFs.
+          </p>
+
+          <div
+            data-reveal
+            style={{ transitionDelay: "0.16s" }}
+            className="mt-8 flex flex-wrap gap-2.5"
+          >
+            <Btn
+              variant="primary"
+              size="lg"
+              onClick={() => nav("/signin?mode=register")}
+            >
+              Get started <Icon name="arrowRight" size={13} />
+            </Btn>
+            <Btn variant="secondary" size="lg">
+              <Icon name="play" size={11} /> Watch a 90-second tour
+            </Btn>
+          </div>
+        </div>
+
+        {/* Product visual — live call → AI processing → PDF summary.
+            Bleeds to the right viewport edge on large screens for scale. */}
+        <div className="relative origin-left overflow-hidden lg:-mr-14 lg:scale-[1.06]">
+          <img
+            src="/Hero-Graphic.png"
+            alt="A MeetNote Ai video call is recorded, processed by AI, and turned into a PDF meeting summary."
+            className="block h-auto w-full"
+            loading="eager"
+            decoding="async"
+          />
+          <HeroRays />
+        </div>
+      </div>
+    </section>
+  );
+}
+
+// AI Notes showcase — the centerpiece. Document + speaker sidebar.
+function NotesShowcase() {
+  const actionItems: [string, string, string][] = [
+    ["Sara Kim", "Finalize launch landing-page copy", "Fri 17"],
+    ["Diego Ortiz", "Draft rollout playbook v1", "Mon 20"],
+    ["Mei Tanaka", "Resolve P0 blocker #482", "Wed 22"],
+  ];
+  const speakers: [string, string][] = [
+    ["Sara Kim", "38%"],
+    ["Diego Ortiz", "24%"],
+    ["Mei Tanaka", "22%"],
+    ["Alex Reyes", "16%"],
+  ];
+
+  return (
+    <section className={`${SHELL} pb-24 pt-5`}>
+      <div
+        data-reveal
+        className="shine hover-lift overflow-hidden rounded-[14px] border border-border-strong bg-surface shadow-lg"
+      >
+        {/* Browser chrome */}
+        <div className="flex items-center gap-2.5 border-b border-border bg-surface px-4 py-2.5">
+          <span className="flex gap-1.5">
+            <span className="h-[9px] w-[9px] rounded-full bg-surface-muted" />
+            <span className="h-[9px] w-[9px] rounded-full bg-surface-muted" />
+            <span className="h-[9px] w-[9px] rounded-full bg-surface-muted" />
+          </span>
+          <div className="hidden flex-1 text-center font-mono text-[12px] text-tertiary sm:block">
+            meetnote.app/n/q3-launch-readiness
+          </div>
+          <span className="inline-flex items-center gap-1.5 rounded-full border border-border bg-background px-2.5 py-1 text-[11px] text-secondary">
+            <span className="ai-glow h-1.5 w-1.5 rounded-full bg-gradient-to-br from-foreground to-secondary" />
+            Notes generated
+          </span>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px]">
+          {/* Document */}
+          <div className="border-b border-border p-6 md:p-12 lg:border-b-0 lg:border-r lg:px-20">
+            <Eyebrow>Meeting Notes</Eyebrow>
+            <h2 className="mt-2 font-display text-[28px] tracking-[-0.03em] text-foreground md:text-[36px]">
+              Q3 Launch Readiness
+            </h2>
+            <div className="mt-2.5 flex flex-wrap items-center gap-x-4 gap-y-2 text-[13px] text-secondary">
+              <span>Tuesday, 14 May · 11:00–11:42</span>
+              <span className="h-[3px] w-[3px] rounded-full bg-muted" />
+              <AvatarGroup
+                names={["Sara Kim", "Diego Ortiz", "Mei Tanaka", "Alex Reyes"]}
+                size={20}
+              />
+              <span>4 attendees</span>
+            </div>
+
+            <Divider className="my-7" />
+
+            <h3 className="mb-2.5 text-[16px] font-semibold text-foreground">Summary</h3>
+            <p className="text-[14.5px] leading-[1.65] text-foreground">
+              The team is on track for the August 14 launch. Engineering closed
+              three of the five P0 blockers this week; the remaining two are
+              scoped to land before code freeze on July 28. Marketing will share
+              the final landing-page copy by Friday.
+            </p>
+
+            <h3 className="mb-2.5 mt-6 text-[16px] font-semibold text-foreground">
+              Decisions
+            </h3>
+            <ul className="m-0 list-disc pl-[18px] text-[14.5px] leading-[1.65] text-foreground">
+              <li>
+                Ship the public beta on <strong>August 14</strong>, gated by
+                feature flag.
+              </li>
+              <li>Defer the Slack integration to the v3.5 release.</li>
+              <li>Diego to own the rollout playbook end-to-end.</li>
+            </ul>
+
+            <h3 className="mb-2.5 mt-6 text-[16px] font-semibold text-foreground">
+              Action items
+            </h3>
+            <div className="flex flex-col gap-2">
+              {actionItems.map(([who, task, due]) => (
+                <div
+                  key={task}
+                  className="flex items-center gap-2.5 rounded-[10px] border border-border bg-surface px-3 py-2.5"
+                >
+                  <span className="h-3.5 w-3.5 shrink-0 rounded border-[1.5px] border-border-focused" />
+                  <Avatar name={who} size={20} />
+                  <span className="min-w-0 flex-1 truncate text-[13.5px] text-foreground">
+                    {task}
+                  </span>
+                  <span className="shrink-0">
+                    <Pill>
+                      <span className="h-1.5 w-1.5 rounded-full bg-tertiary" />
+                      {due}
+                    </Pill>
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Right rail */}
+          <div className="bg-background p-6 md:p-8">
+            <Eyebrow className="mb-3">Speakers</Eyebrow>
+            {speakers.map(([n, p]) => (
+              <div key={n} className="flex items-center gap-2.5 py-2">
+                <Avatar name={n} size={26} />
+                <div className="flex-1">
+                  <div className="text-[12.5px] font-medium text-foreground">{n}</div>
+                  <div className="relative mt-1.5 h-[3px] overflow-hidden rounded-full bg-surface-muted">
+                    <div
+                      className="bar-fill absolute inset-y-0 left-0 rounded-full bg-foreground"
+                      style={{ ["--w" as string]: p } as CSSProperties}
+                    />
+                  </div>
+                </div>
+                <span className="font-mono text-[11px] text-tertiary tabular-nums">
+                  {p}
+                </span>
+              </div>
+            ))}
+
+            <Divider className="my-6" />
+
+            <Eyebrow className="mb-3">Mentioned</Eyebrow>
+            <div className="flex flex-wrap gap-1.5">
+              {["#q3-launch", "#beta", "#playbook", "#code-freeze", "@diego", "@sara"].map(
+                (t) => (
+                  <Pill key={t}>{t}</Pill>
+                ),
+              )}
+            </div>
+
+            <Divider className="my-6" />
+
+            <Btn variant="secondary" size="sm" className="w-full">
+              <Icon name="download" size={13} /> Export as PDF
+            </Btn>
+            <Btn variant="ghost" size="sm" className="mt-1.5 w-full">
+              <Icon name="link" size={13} /> Share read-only link
+            </Btn>
+          </div>
+        </div>
+      </div>
+
+      <div className="mt-4 text-center text-[12px] text-tertiary">
+        Sample export · the same document layout ships as PDF.
+      </div>
+    </section>
+  );
+}
+
+
+
+interface FeatureCardProps {
+  img: string;
+  /** utility classes controlling how the render sits in the visual well;
+   *  CARD1/CARD3 bake text, so they're cropped (object-top) to the visual. */
+  imgClass: string;
+  icon: string;
+  title: string;
+  body: string;
+  /** optional CSS 3D transform for perspective on the outer cards. */
+  tilt?: string;
+  delay?: number;
+}
+
+function FeatureCard({ img, imgClass, icon, title, body, tilt, delay }: FeatureCardProps) {
+  return (
+    <div data-reveal style={{
+      perspective: "1000px",
+      transitionDelay: delay ? `${delay}s` : undefined,
+    }}>
+      <div
+        style={tilt ? { transform: tilt } : undefined}
+        className="flex flex-col rounded-[24px] border border-white/10 bg-[#0e0e12] p-4 shadow-[0_34px_64px_-28px_rgba(0,0,0,0.7)]"
+      >
+        {/* Visual well — the render sits here as a picture, not the card. */}
+        <div className="overflow-hidden">
+          <img
+            src={img}
+            alt={title}
+            className={`w-full h-full grayscale ${imgClass}`}
+            loading="lazy"
+            decoding="async"
+          />
+        </div>
+
+        {/* Copy */}
+        <div className="px-1 pb-1 pt-5">
+          <span className="inline-flex h-11 w-11 items-center justify-center rounded-[13px] bg-white/[0.12] text-white">
+            <Icon name={icon} size={19} />
+          </span>
+          <h3 className="mt-5 text-[20px] font-semibold leading-[1.2] tracking-[-0.02em] text-white">
+            {title}
+          </h3>
+          <p className="mt-3 text-[14px] leading-[1.6] text-white/55">{body}</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function Features() {
+  return (
+    <section className={`${SHELL} pb-24 pt-10`}>
+      <div
+        className="grid grid-cols-1 items-center gap-6 md:grid-cols-3"
+        style={{ perspective: "1600px" }}
+      >
+        <FeatureCard
+          img="/CARD1.png"
+          imgClass="h-[210px] object-cover object-top"
+          icon="list"
+          title="Notes that read like a colleague wrote them."
+          body="Speaker-aware summaries, decisions, and action items in a layout designed for reading, not for parsing transcripts."
+          tilt="rotateY(14deg)"
+        />
+        <FeatureCard
+          img="/CARD2.png"
+          imgClass="h-[210px] object-contain"
+          icon="fileText"
+          title="A document, not a transcript."
+          body="Every meeting becomes a structured page with sections, citations, and a clean type hierarchy. Export to PDF in one click."
+          delay={0.09}
+        />
+        <FeatureCard
+          img="/CARD3.png"
+          imgClass="h-[210px] object-cover object-top"
+          icon="users"
+          title="Quiet collaboration."
+          body="Reactions, comments, and assignments live in the margins. No flashing dots, no noisy notifications, your team stays in flow."
+          tilt="rotateY(-14deg)"
+          delay={0.18}
+        />
+      </div>
+    </section>
+  );
+}
+
+
+
+function Workflow() {
+  const steps = [
+    {
+      n: "01",
+      t: "Capture",
+      d: "Drop MeetNote Ai into any video call or upload a recording. We listen in the background, with no bot in the room.",
+    },
+    {
+      n: "02",
+      t: "Synthesize",
+      d: "Within 60 seconds of hang-up, you get a structured page: summary, decisions, action items, citations.",
+    },
+    {
+      n: "03",
+      t: "Distribute",
+      d: "Share a read-only link, export a polished PDF, or pipe the action items into your task tool of choice.",
+    },
+  ];
+
+  return (
+    <section className={`${SHELL} pb-24 pt-10`}>
+      <div className="grid grid-cols-1 items-start gap-12 lg:grid-cols-[380px_1fr] lg:gap-20">
+        <div data-reveal>
+          <Eyebrow>Workflow</Eyebrow>
+          <h2 className="mt-3 font-display text-[36px] leading-none tracking-[-0.03em] text-foreground md:text-[44px]">
+            Three quiet steps.
+            <br />
+            No new habits.
+          </h2>
+          <p className="mt-[18px] text-[15px] leading-[1.55] text-secondary">
+            MeetNote Ai slots into the meetings you already run. You leave the call
+            with a finished document, not a homework assignment.
+          </p>
+        </div>
+        <div className="flex flex-col">
+          {steps.map((s, i) => (
+            <div
+              key={s.n}
+              data-reveal
+              style={{ transitionDelay: `${i * 0.1}s` }}
+              className="group grid grid-cols-[60px_1fr] gap-6 border-t border-border py-6 transition-colors duration-300 hover:border-border-focused md:grid-cols-[90px_1fr]"
+            >
+              <div className="pt-1 font-mono text-[13px] text-tertiary transition-all duration-300 group-hover:translate-x-1 group-hover:text-foreground">
+                {s.n}
+              </div>
+              <div>
+                <h3 className="text-[22px] font-semibold tracking-[-0.02em] text-foreground">
+                  {s.t}
+                </h3>
+                <p className="mt-2 max-w-[520px] text-[14.5px] leading-[1.6] text-secondary">
+                  {s.d}
+                </p>
+              </div>
+            </div>
+          ))}
+          <div className="border-t border-border" />
+        </div>
+      </div>
+    </section>
+  );
+}
+
+
+
+function CTABand() {
+  const nav = useNavigate();
+  return (
+    <section className={`${SHELL} pb-24 pt-10`}>
+      <div
+        data-reveal
+        className="cta-sheen grid grid-cols-1 items-end gap-10 rounded-[24px] bg-foreground px-8 py-12 md:grid-cols-[1fr_auto] md:px-14 md:py-16"
+      >
+        <div>
+          <Eyebrow className="text-background/50">Try MeetNote Ai</Eyebrow>
+          <h2
+            className="mt-3.5 font-display text-background"
+            style={{
+              fontSize: "clamp(36px, 6vw, 56px)",
+              lineHeight: 1,
+              letterSpacing: "-0.03em",
+            }}
+          >
+            Clarity after meetings.
+          </h2>
+          <p className="mt-[18px] max-w-[480px] text-[16px] text-background/70">
+            Two minutes to set up. No bot in your call, no new habits, just a
+            finished document waiting when you hang up.
+          </p>
+        </div>
+        <div className="flex flex-col gap-2.5">
+          <button
+            onClick={() => nav("/signin?mode=register")}
+            className="shine shine-dark inline-flex h-11 items-center justify-center gap-2 rounded-[10px] border border-background bg-background px-5 text-[15px] font-medium tracking-tight text-foreground transition-all duration-150 hover:brightness-95 active:scale-[0.98]"
+          >
+            Get started <Icon name="arrowRight" size={13} />
+          </button>
+          <button className="inline-flex h-11 items-center justify-center rounded-[10px] border border-transparent px-5 text-[15px] font-medium tracking-tight text-background transition-colors duration-150 hover:bg-white/10">
+            Book a 15-min demo
+          </button>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+const FAQS: { q: string; a: string }[] = [
+  {
+    q: "Do I need to install anything, or add a bot to my call?",
+    a: "No. There's no bot avatar sitting in the meeting. The host starts MeetNote Ai and participants just join with a room ID in the browser, and it records in the background.",
+  },
+  {
+    q: "How soon do I get my notes after a meeting?",
+    a: "Usually within about a minute of hang-up. You get a structured page: a summary, the decisions, action items, and a speaker breakdown, not a raw transcript.",
+  },
+  {
+    q: "What's actually in the notes?",
+    a: "A readable document: a short summary, the decisions made, action items with owners, and who spoke about what, written the way a colleague would, not a wall of transcript text.",
+  },
+  {
+    q: "Is MeetNote Ai free?",
+    a: "Yes, and it stays that way for as long as I can keep running it on free resources.",
+  },
+];
+
+function Faq() {
+  const [open, setOpen] = useState(0);
+  return (
+    <section className={`${SHELL} pb-24 pt-10`}>
+      <div className="mx-auto max-w-[760px]">
+        <Eyebrow className="text-center">FAQ</Eyebrow>
+        <h2
+          data-reveal
+          className="mt-3 text-center font-display text-[34px] leading-[1.05] tracking-[-0.03em] text-foreground md:text-[44px]"
+        >
+          Questions, answered.
+        </h2>
+
+        <div data-reveal className="mt-10 border-t border-border">
+          {FAQS.map((f, i) => {
+            const isOpen = open === i;
+            return (
+              <div key={i} className="border-b border-border">
+                <button
+                  onClick={() => setOpen(isOpen ? -1 : i)}
+                  aria-expanded={isOpen}
+                  className="flex w-full items-center gap-4 py-5 text-left"
+                >
+                  <span className="flex-1 text-[16px] font-medium tracking-tight text-foreground md:text-[17px]">
+                    {f.q}
+                  </span>
+                  <Icon
+                    name="chevronDown"
+                    size={18}
+                    className={`shrink-0 text-tertiary transition-transform duration-300 ${isOpen ? "rotate-180" : ""
+                      }`}
+                  />
+                </button>
+                <div
+                  className={`grid transition-all duration-300 ease-[cubic-bezier(0.2,0.7,0.3,1)] ${isOpen ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0"
+                    }`}
+                >
+                  <div className="min-h-0 overflow-hidden">
+                    <p className="pb-5 pr-8 text-[14.5px] leading-[1.65] text-secondary">
+                      {f.a}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function Footer() {
+  const columns: [string, string[]][] = [
+    ["Product", ["Notes", "Recordings", "PDF Export", "API", "Changelog"]],
+    ["Company", ["About", "Customers", "Careers", "Brand"]],
+    ["Resources", ["Help", "Privacy", "Security", "Status"]],
+    ["Connect", ["Twitter", "LinkedIn", "RSS", "Contact"]],
+  ];
+
+  return (
+    <footer className={`${SHELL} border-t border-border pb-14 pt-9`}>
+      <div
+        data-reveal
+        className="grid grid-cols-2 gap-10 pt-9 md:grid-cols-[2fr_1fr_1fr_1fr_1fr]"
+      >
+        <div className="col-span-2 md:col-span-1">
+          <Logo size="lg" />
+          <p className="mt-3.5 max-w-[280px] text-[13px] text-tertiary">
+            Made by a small team in Lisbon and Toronto. No outside funding. No
+            bot in your call.
+          </p>
+        </div>
+        {columns.map(([h, links]) => (
+          <div key={h}>
+            <div className="mb-3 text-[12px] font-semibold text-foreground">{h}</div>
+            <div className="flex flex-col gap-2">
+              {links.map((l) => (
+                <a
+                  key={l}
+                  className="cursor-pointer text-[13px] text-secondary no-underline transition-colors hover:text-foreground"
+                >
+                  {l}
+                </a>
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+      <div className="mt-14 flex flex-wrap items-center gap-3.5 border-t border-border pt-5 text-[12px] text-tertiary">
+        <span>© 2026 MeetNote Ai, Inc.</span>
+        <span>·</span>
+        <span>All rights reserved</span>
+        <span className="flex-1" />
+        <span className="inline-flex items-center gap-1.5">
+          <span className="h-1.5 w-1.5 rounded-full bg-success" /> All systems
+          operational
+        </span>
+      </div>
+    </footer>
+  );
+}
+
+export function LandingPage() {
+  const rootRef = useRef<HTMLDivElement>(null);
+  const barRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const root = rootRef.current;
+    if (!root) return;
+
+    // Reveal-on-scroll: unhide each [data-reveal] the first time it enters view.
+    const io = new IntersectionObserver(
+      (entries) => {
+        for (const e of entries) {
+          if (e.isIntersecting) {
+            e.target.classList.add("is-visible");
+            io.unobserve(e.target);
+          }
+        }
+      },
+      { root, threshold: 0.12, rootMargin: "0px 0px -8% 0px" },
+    );
+    root.querySelectorAll("[data-reveal]").forEach((el) => io.observe(el));
+
+    // Top scroll-progress bar tracks the container's scroll position.
+    const onScroll = () => {
+      const bar = barRef.current;
+      if (!bar) return;
+      const max = root.scrollHeight - root.clientHeight;
+      bar.style.setProperty("--p", max > 0 ? String(root.scrollTop / max) : "0");
+    };
+    root.addEventListener("scroll", onScroll, { passive: true });
+    onScroll();
+
+    return () => {
+      io.disconnect();
+      root.removeEventListener("scroll", onScroll);
+    };
+  }, []);
+
+  return (
+    <div
+      ref={rootRef}
+      className="relative h-full overflow-y-auto overflow-x-hidden bg-background text-foreground"
+    >
+      <div className="sticky top-0 z-40 h-[2px] w-full bg-transparent">
+        <div ref={barRef} className="scroll-progress h-full w-full bg-foreground" />
+      </div>
+      <LandingNav />
+      <Hero />
+      <NotesShowcase />
+      <Features />
+      <Workflow />
+      <CTABand />
+      <Faq />
+      <Footer />
+    </div>
+  );
+}

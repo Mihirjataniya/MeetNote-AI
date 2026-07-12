@@ -255,7 +255,7 @@ export function MeetingLobby({
               <span className="w-[22px] h-[22px] rounded-[6px] bg-white text-[#111] inline-flex items-center justify-center font-display text-[12px] font-bold">
                 M
               </span>
-              MeetNote
+              MeetNote Ai
             </span>
             <h1 className="text-[22px] sm:text-[26px] font-semibold tracking-[-0.02em] font-display mt-5 text-white leading-tight">
               {isHost ? "Ready to start?" : "Ready to join?"}

@@ -15,7 +15,7 @@ function formatTimeRange(startIso: string, durationMin: number): string {
   const end = new Date(start.getTime() + durationMin * 60_000);
   const fmt = (d: Date) =>
     d.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: false });
-  return `${fmt(start)} — ${fmt(end)}`;
+  return `${fmt(start)} to ${fmt(end)}`;
 }
 
 function formatRelativeDate(iso: string): string {
@@ -255,7 +255,7 @@ export function HomePage() {
             </div>
             <div className="flex flex-col gap-2 flex-1">
               {[
-                { t: "00:00:08", txt: "Welcome back everyone — let's run through the ship checklist." },
+                { t: "00:00:08", txt: "Welcome back everyone, let's run through the ship checklist." },
                 { t: "00:00:21", txt: "Staging deploy is green. Logs look clean across all regions." },
                 { t: "00:00:34", txt: "We're shipping behind the flag tonight. Cut at 8 PM local.", live: true },
               ].map((m, i) => (

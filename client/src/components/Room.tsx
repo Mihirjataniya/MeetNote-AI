@@ -236,7 +236,7 @@ export function Room({
           <span className="w-[22px] h-[22px] rounded-[6px] bg-white text-[#111] inline-flex items-center justify-center font-display text-[12px] font-bold shrink-0">
             M
           </span>
-          <span className="hidden sm:inline">MeetNote</span>
+          <span className="hidden sm:inline">MeetNote Ai</span>
         </span>
 
         <div className="h-5 w-px bg-white/[0.1] hidden sm:block" />

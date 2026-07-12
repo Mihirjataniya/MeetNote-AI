@@ -7,6 +7,7 @@ import "./stores/useSocketStore";
 import { AuthPage } from "./components/AuthPage";
 import { AppShell } from "./components/shell/AppShell";
 import { Toaster } from "./components/shell/Toaster";
+import { LandingPage } from "./pages/LandingPage";
 import { HomePage } from "./pages/HomePage";
 import { SchedulesPage } from "./pages/SchedulesPage";
 import { HistoryPage } from "./pages/HistoryPage";
@@ -28,7 +29,7 @@ function AppRoutes() {
             <span className="w-[22px] h-[22px] rounded-[6px] bg-accent text-accent-foreground inline-flex items-center justify-center font-display text-[13px] font-bold">
               M
             </span>
-            MeetNote
+            MeetNote Ai
           </span>
           <p className="mt-4 text-[14px] text-secondary">Loading...</p>
         </div>
@@ -37,7 +38,13 @@ function AppRoutes() {
   }
 
   if (!user) {
-    return <AuthPage />;
+    return (
+      <Routes>
+        <Route path="/" element={<LandingPage />} />
+        <Route path="/signin" element={<AuthPage />} />
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+    );
   }
 
   return (

@@ -33,7 +33,7 @@ export function JoinForm() {
           <span className="w-[22px] h-[22px] rounded-[6px] bg-accent text-accent-foreground inline-flex items-center justify-center font-display text-[13px] font-bold">
             M
           </span>
-          MeetNote
+          MeetNote Ai
         </Link>
 
         <h1 className="text-[28px] font-semibold tracking-tight font-display text-foreground">

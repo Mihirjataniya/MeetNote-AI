@@ -160,8 +160,62 @@ function HeroRays() {
  * Sections
  * ------------------------------------------------------------------ */
 
+type BeforeInstallPromptEvent = Event & {
+  prompt: () => Promise<void>;
+  userChoice: Promise<{ outcome: "accepted" | "dismissed" }>;
+};
+
+/* Captures the browser's PWA install prompt so a button can trigger it.
+ * `beforeinstallprompt` only fires on Chromium, over https/localhost, once the
+ * service worker is registered and the app isn't already installed — so it's
+ * absent in dev (SW disabled) and on iOS. Callers fall back accordingly. */
+function useInstallPrompt() {
+  const [deferred, setDeferred] = useState<BeforeInstallPromptEvent | null>(null);
+  const [installed, setInstalled] = useState(false);
+
+  useEffect(() => {
+    const standalone =
+      window.matchMedia("(display-mode: standalone)").matches ||
+      (navigator as unknown as { standalone?: boolean }).standalone === true;
+    setInstalled(standalone);
+
+    const onPrompt = (e: Event) => {
+      e.preventDefault();
+      setDeferred(e as BeforeInstallPromptEvent);
+    };
+    const onInstalled = () => {
+      setInstalled(true);
+      setDeferred(null);
+    };
+    window.addEventListener("beforeinstallprompt", onPrompt);
+    window.addEventListener("appinstalled", onInstalled);
+    return () => {
+      window.removeEventListener("beforeinstallprompt", onPrompt);
+      window.removeEventListener("appinstalled", onInstalled);
+    };
+  }, []);
+
+  const install = async () => {
+    if (!deferred) return false;
+    await deferred.prompt();
+    await deferred.userChoice;
+    setDeferred(null);
+    return true;
+  };
+
+  return { canInstall: !!deferred && !installed, install };
+}
+
 function LandingNav() {
   const nav = useNavigate();
+  const { canInstall, install } = useInstallPrompt();
+
+  const handleGet = async () => {
+    // Prefer the native install prompt; otherwise send them to sign up.
+    if (canInstall && (await install())) return;
+    nav("/signin?mode=register");
+  };
+
   return (
     <div className="sticky top-0 z-20 border-b border-border bg-background/80 backdrop-blur-xl">
       <div className="mx-auto flex max-w-[1280px] items-center gap-7 px-6 py-3.5 md:px-14">
@@ -172,8 +226,16 @@ function LandingNav() {
             Sign in
           </Btn>
         </span>
-        <Btn variant="primary" size="sm" onClick={() => nav("/signin?mode=register")}>
-          Get MeetNote Ai <Icon name="arrowRight" size={12} />
+        <Btn variant="primary" size="sm" onClick={handleGet}>
+          {canInstall ? (
+            <>
+              Install app <Icon name="download" size={12} />
+            </>
+          ) : (
+            <>
+              Get MeetNote Ai <Icon name="arrowRight" size={12} />
+            </>
+          )}
         </Btn>
       </div>
     </div>
@@ -672,52 +734,83 @@ function Faq() {
   );
 }
 
-function Footer() {
-  const columns: [string, string[]][] = [
-    ["Product", ["Notes", "Recordings", "PDF Export", "API", "Changelog"]],
-    ["Company", ["About", "Customers", "Careers", "Brand"]],
-    ["Resources", ["Help", "Privacy", "Security", "Status"]],
-    ["Connect", ["Twitter", "LinkedIn", "RSS", "Contact"]],
-  ];
+const SOCIALS: { label: string; href: string; icon: ReactNode }[] = [
+  {
+    label: "X (Twitter)",
+    href: "https://x.com/devwithdelulu",
+    icon: (
+      <svg width={15} height={15} viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
+        <path d="M9.52 6.77L15.48 0h-1.41L8.9 5.88 4.76 0H0l6.25 8.9L0 16h1.41l5.47-6.21L11.24 16H16L9.52 6.77zM7.6 8.98l-.63-.89L1.92 1.04h2.17l4.07 5.7.63.89 5.29 7.41h-2.17L7.6 8.98z" />
+      </svg>
+    ),
+  },
+  {
+    label: "LinkedIn",
+    href: "https://www.linkedin.com/in/mihir-jataniya/",
+    icon: (
+      <svg width={15} height={15} viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
+        <path d="M13.63 13.63h-2.37V9.9c0-.89-.02-2.03-1.24-2.03-1.24 0-1.43.97-1.43 1.97v3.79H6.22V6h2.28v1.04h.03c.32-.6 1.09-1.24 2.25-1.24 2.41 0 2.85 1.58 2.85 3.64v4.19zM3.55 4.96a1.38 1.38 0 110-2.76 1.38 1.38 0 010 2.76zm1.19 8.67H2.36V6h2.38v7.63zM14.82 0H1.18C.53 0 0 .52 0 1.16v13.68C0 15.48.53 16 1.18 16h13.64c.65 0 1.18-.52 1.18-1.16V1.16C16 .52 15.47 0 14.82 0z" />
+      </svg>
+    ),
+  },
+  {
+    label: "GitHub repository",
+    href: "https://github.com/Mihirjataniya/MeetNote-AI",
+    icon: (
+      <svg width={15} height={15} viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
+        <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0016 8c0-4.42-3.58-8-8-8z" />
+      </svg>
+    ),
+  },
+  {
+    label: "Email",
+    href: "mailto:mihirjataniya1612@gmail.com",
+    icon: <Icon name="mail" size={15} />,
+  },
+];
 
+function Footer() {
   return (
     <footer className={`${SHELL} border-t border-border pb-14 pt-9`}>
       <div
         data-reveal
-        className="grid grid-cols-2 gap-10 pt-9 md:grid-cols-[2fr_1fr_1fr_1fr_1fr]"
+        className="flex flex-col gap-6 pt-9 sm:flex-row sm:items-end sm:justify-between"
       >
-        <div className="col-span-2 md:col-span-1">
+        <div>
           <Logo size="lg" />
-          <p className="mt-3.5 max-w-[280px] text-[13px] text-tertiary">
-            Made by a small team in Lisbon and Toronto. No outside funding. No
-            bot in your call.
+          <p className="mt-3.5 max-w-[320px] text-[13px] leading-relaxed text-tertiary">
+            Made by{" "}
+            <a
+              href="https://github.com/Mihirjataniya"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-secondary underline decoration-border-strong underline-offset-2 transition-colors hover:text-foreground"
+            >
+              Mihir Jataniya
+            </a>
+            . A personal project, no outside funding. No bot in your call.
           </p>
         </div>
-        {columns.map(([h, links]) => (
-          <div key={h}>
-            <div className="mb-3 text-[12px] font-semibold text-foreground">{h}</div>
-            <div className="flex flex-col gap-2">
-              {links.map((l) => (
-                <a
-                  key={l}
-                  className="cursor-pointer text-[13px] text-secondary no-underline transition-colors hover:text-foreground"
-                >
-                  {l}
-                </a>
-              ))}
-            </div>
-          </div>
-        ))}
+        <div className="flex items-center gap-2.5">
+          {SOCIALS.map((s) => (
+            <a
+              key={s.label}
+              href={s.href}
+              target={s.href.startsWith("mailto:") ? undefined : "_blank"}
+              rel="noopener noreferrer"
+              title={s.label}
+              aria-label={s.label}
+              className="inline-flex h-9 w-9 items-center justify-center rounded-[10px] border border-border text-secondary transition-colors hover:border-border-focused hover:text-foreground"
+            >
+              {s.icon}
+            </a>
+          ))}
+        </div>
       </div>
-      <div className="mt-14 flex flex-wrap items-center gap-3.5 border-t border-border pt-5 text-[12px] text-tertiary">
-        <span>© 2026 MeetNote Ai, Inc.</span>
+      <div className="mt-12 flex flex-wrap items-center gap-3.5 border-t border-border pt-5 text-[12px] text-tertiary">
+        <span>© 2026 MeetNote Ai</span>
         <span>·</span>
-        <span>All rights reserved</span>
-        <span className="flex-1" />
-        <span className="inline-flex items-center gap-1.5">
-          <span className="h-1.5 w-1.5 rounded-full bg-success" /> All systems
-          operational
-        </span>
+        <span>Built for learning, shared for fun</span>
       </div>
     </footer>
   );

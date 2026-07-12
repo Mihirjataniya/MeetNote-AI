@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useAuthStore } from "../stores/useAuthStore";
 
@@ -31,6 +31,58 @@ function DocLines({ widths }: { widths: number[] }) {
   );
 }
 
+const FACTS = [
+  "People forget about half of new information within an hour, and roughly 70% within a day. Notes are how the other half survives.",
+  "The average knowledge worker spends close to 18 hours a week in meetings. Most of what's decided is never written down.",
+  "After an interruption it takes about 23 minutes to fully refocus. Not having to take notes keeps you in the room.",
+  "We speak around 150 words a minute but type closer to 40. Talking outruns any human trying to write it down.",
+  "Working memory holds only about four things at once. Everything past that needs a place to live.",
+  "A structured page with decisions and action items is recalled far better than a raw wall-of-text transcript.",
+];
+
+function RotatingFact() {
+  const [i, setI] = useState(() => Math.floor(Math.random() * FACTS.length));
+  const [visible, setVisible] = useState(true);
+
+  useEffect(() => {
+    const id = setInterval(() => {
+      setVisible(false);
+      // wait out the fade before swapping text, then fade back in
+      setTimeout(() => {
+        setI((prev) => (prev + 1) % FACTS.length);
+        setVisible(true);
+      }, 400);
+    }, 6500);
+    return () => clearInterval(id);
+  }, []);
+
+  return (
+    <div className="max-w-[360px]">
+      <div className="text-[11px] font-medium uppercase tracking-[0.12em] text-tertiary">
+        Did you know
+      </div>
+      <p
+        className="mt-4 font-serif text-[21px] xl:text-[25px] leading-[1.4] text-foreground tracking-[-0.01em] italic transition-opacity duration-[400ms]"
+        style={{ opacity: visible ? 1 : 0 }}
+      >
+        {FACTS[i]}
+      </p>
+      <div className="mt-6 flex items-center gap-1.5">
+        {FACTS.map((_, idx) => (
+          <span
+            key={idx}
+            className="h-1 rounded-full transition-all duration-300"
+            style={{
+              width: idx === i ? 18 : 6,
+              background: idx === i ? "var(--color-foreground)" : "var(--color-border-strong)",
+            }}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function SidePanel({ side }: { side: "left" | "right" }) {
   return (
     <div
@@ -39,23 +91,7 @@ function SidePanel({ side }: { side: "left" | "right" }) {
       }`}
       style={{ order: side === "right" ? 1 : 0 }}
     >
-      <div className="max-w-[360px]">
-        <div className="text-[11px] font-medium uppercase tracking-[0.12em] text-tertiary">
-          From the docs
-        </div>
-        <p className="mt-4 font-serif text-[22px] xl:text-[26px] leading-[1.35] text-foreground tracking-[-0.01em] italic">
-          "MeetNote Ai is the quietest piece of software I've installed in years. It does its job, and gets out of the way."
-        </p>
-        <div className="mt-5 flex items-center gap-2.5">
-          <span className="w-7 h-7 rounded-full bg-[#3A3A38] text-white inline-flex items-center justify-center text-[11px] font-semibold shrink-0">
-            PS
-          </span>
-          <div>
-            <div className="text-[13px] font-semibold text-foreground">Priya Shah</div>
-            <div className="text-[12px] text-tertiary">Head of Operations, Halcyon</div>
-          </div>
-        </div>
-      </div>
+      <RotatingFact />
 
       <div className="flex-1 min-h-8" />
 

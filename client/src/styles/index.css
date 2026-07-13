@@ -123,6 +123,20 @@
   ::-webkit-scrollbar-track { background: transparent; }
 }
 
+/* iOS Safari zooms the layout whenever a focused field renders below 16px, and
+   there is no way to opt out short of locking the viewport scale (which breaks
+   pinch-zoom for everyone). So on touch devices the fields go to 16px and the
+   14px type scale stays desktop-only. Deliberately unlayered — Tailwind's
+   utilities live in @layer utilities, and unlayered rules outrank every layered
+   one, so this beats the per-field text-[14px] without !important. */
+@media (pointer: coarse) {
+  input:not([type="checkbox"]):not([type="radio"]),
+  textarea,
+  select {
+    font-size: 16px;
+  }
+}
+
 /* --- Animations --- */
 @keyframes fade-in {
   from { opacity: 0; }

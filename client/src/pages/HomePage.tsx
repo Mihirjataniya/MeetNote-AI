@@ -1,3 +1,4 @@
+import { useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuthStore } from "../stores/useAuthStore";
 import { useUIStore } from "../stores/useUIStore";
@@ -101,13 +102,20 @@ export function HomePage() {
   const { data: recentMeetings = [], isLoading: loadingMeetings } = useRecentMeetings(5);
   const { data: stats } = useMeetingStats();
 
-  const now = new Date();
-  const sevenDaysOut = new Date(now.getTime() + 7 * 86_400_000);
-  const { data: schedules } = useScheduledMeetings({
-    from: now.toISOString(),
-    to: sevenDaysOut.toISOString(),
-    limit: 50,
-  });
+  const { now, scheduleRange } = useMemo(() => {
+    const current = new Date();
+    current.setSeconds(0, 0);
+    const sevenDaysOut = new Date(current.getTime() + 7 * 86_400_000);
+    return {
+      now: current,
+      scheduleRange: {
+        from: current.toISOString(),
+        to: sevenDaysOut.toISOString(),
+        limit: 50,
+      },
+    };
+  }, []);
+  const { data: schedules } = useScheduledMeetings(scheduleRange);
 
   const upcoming = (schedules?.items ?? [])
     .filter((s) => s.effectiveStatus !== "cancelled" && s.effectiveStatus !== "ended")

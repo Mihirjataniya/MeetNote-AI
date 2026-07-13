@@ -3,6 +3,17 @@ import { useNavigate } from "react-router-dom";
 import { Avatar, AvatarGroup } from "../components/shell/Avatar";
 import { Icon } from "../components/shell/Icon";
 
+/* Marketing renders are served from Cloudinary (f_auto,q_auto) rather than
+   client/public, so they stay off the app bundle and out of the PWA cache. */
+const CDN = "https://res.cloudinary.com/dgm9tbtvf/image/upload/f_auto,q_auto/meetnote/landing";
+
+const IMG = {
+  hero: `${CDN}/Hero-Graphic.png`,
+  card1: `${CDN}/CARD1.png`,
+  card2: `${CDN}/CARD2.png`,
+  card3: `${CDN}/CARD3.png`,
+};
+
 /* ------------------------------------------------------------------ *
  * Shared primitives — ports of the design's mn-* utility classes onto
  * the app's Tailwind tokens (see styles/index.css @theme).
@@ -229,7 +240,7 @@ function LandingNav() {
         <Btn variant="primary" size="sm" onClick={handleGet}>
           {canInstall ? (
             <>
-              Install app <Icon name="download" size={12} />
+              Get MeetNote <Icon name="download" size={12} />
             </>
           ) : (
             <>
@@ -304,7 +315,7 @@ function Hero() {
             Bleeds to the right viewport edge on large screens for scale. */}
         <div className="relative origin-left overflow-hidden lg:-mr-14 lg:scale-[1.06]">
           <img
-            src="/Hero-Graphic.png"
+            src={IMG.hero}
             alt="A MeetNote Ai video call is recorded, processed by AI, and turned into a PDF meeting summary."
             className="block h-auto w-full"
             loading="eager"
@@ -527,7 +538,7 @@ function Features() {
         style={{ perspective: "1600px" }}
       >
         <FeatureCard
-          img="/CARD1.png"
+          img={IMG.card1}
           imgClass="h-[210px] object-cover object-top"
           icon="list"
           title="Notes that read like a colleague wrote them."
@@ -535,7 +546,7 @@ function Features() {
           tilt="rotateY(14deg)"
         />
         <FeatureCard
-          img="/CARD2.png"
+          img={IMG.card2}
           imgClass="h-[210px] object-contain"
           icon="fileText"
           title="A document, not a transcript."
@@ -543,7 +554,7 @@ function Features() {
           delay={0.09}
         />
         <FeatureCard
-          img="/CARD3.png"
+          img={IMG.card3}
           imgClass="h-[210px] object-cover object-top"
           icon="users"
           title="Quiet collaboration."

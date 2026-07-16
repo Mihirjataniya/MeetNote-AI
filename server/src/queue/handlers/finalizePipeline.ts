@@ -1,12 +1,34 @@
 import fs from "node:fs";
 import path from "node:path";
 import { spawn } from "node:child_process";
+import { Types } from "mongoose";
 import { Recording } from "../../models/Recording";
 import { Transcript } from "../../models/Transcript";
+import type { NotesStatus, TranscriptStatus } from "../../types/index";
 import { storageService } from "../../services/storageService";
 import { transcriptionService } from "../../services/transcriptionService";
-import { notifyTranscriptStatus } from "../../services/notificationService";
+import { notifyNotesStatus } from "../../services/notificationService";
 import { enqueue, type FinalizePipelineMessage } from "../queues";
+
+// Record a terminal pipeline outcome on the field the dashboard reads
+// (Transcript.notesStatus), creating the transcript row if the pipeline died
+// before one existed (e.g. the no-audio path). Without this, pre-notes
+// failures leave notesStatus null/pending and the UI shows a blank card.
+async function markNotesStatus(
+  meetingId: string,
+  recordingId: Types.ObjectId,
+  notesStatus: NotesStatus,
+  transcriptStatusOnInsert: TranscriptStatus
+): Promise<void> {
+  await Transcript.updateOne(
+    { meetingId },
+    {
+      $set: { notesStatus },
+      $setOnInsert: { recordingId, status: transcriptStatusOnInsert },
+    },
+    { upsert: true }
+  );
+}
 
 // Seconds between drain re-checks while waiting for in-flight batches.
 const DRAIN_RETRY_DELAY_S = 15;
@@ -74,39 +96,54 @@ export async function handleFinalizePipeline(msg: FinalizePipelineMessage): Prom
   const webmPaths = collectWebm(roomDir, msg.webmPaths);
 
   if (webmPaths.length === 0) {
-    console.error(`[Finalize] No audio files for meeting ${meetingId}`);
+    // No audio ever captured (muted / very short meeting). Terminal, but NOT an
+    // error — mark notes "skipped" so the dashboard shows a neutral state
+    // instead of a blank card or a scary "failed".
+    console.warn(`[Finalize] No audio files for meeting ${meetingId} — skipping notes`);
     recording.status = "failed";
     await recording.save();
-    await notifyTranscriptStatus(meetingId, "failed");
+    await markNotesStatus(meetingId, recording._id, "skipped", "failed");
+    await notifyNotesStatus(meetingId, "skipped");
     return;
   }
 
-  // --- Upload originals to Cloudinary -------------------------------------
-  console.log(`[Finalize] Uploading ${webmPaths.length} file(s) to Cloudinary for meeting ${meetingId}…`);
-  const cloudinaryFiles = await storageService.uploadAudioFiles(webmPaths, roomId);
+  try {
+    // --- Upload originals to Cloudinary -----------------------------------
+    console.log(`[Finalize] Uploading ${webmPaths.length} file(s) to Cloudinary for meeting ${meetingId}…`);
+    const cloudinaryFiles = await storageService.uploadAudioFiles(webmPaths, roomId);
 
-  recording.cloudinaryUrls = cloudinaryFiles;
-  recording.durationMs = msg.startedAtMs ? Date.now() - msg.startedAtMs : 0;
-  recording.status = "ready";
-  await recording.save();
+    recording.cloudinaryUrls = cloudinaryFiles;
+    recording.durationMs = msg.startedAtMs ? Date.now() - msg.startedAtMs : 0;
+    recording.status = "ready";
+    await recording.save();
 
-  // --- Transcript: incremental already exists, else full-file fallback ----
-  if (!transcript) {
-    console.log(`[Finalize] No incremental transcript for meeting ${meetingId}, running full transcription`);
-    const wavPath = await mergeToWav(webmPaths, roomDir);
-    try {
-      await transcriptionService.transcribe(recording._id.toString(), meetingId, wavPath);
-    } finally {
-      try { fs.unlinkSync(wavPath); } catch {}
+    // --- Transcript: incremental already exists, else full-file fallback --
+    if (!transcript) {
+      console.log(`[Finalize] No incremental transcript for meeting ${meetingId}, running full transcription`);
+      const wavPath = await mergeToWav(webmPaths, roomDir);
+      try {
+        await transcriptionService.transcribe(recording._id.toString(), meetingId, wavPath);
+      } finally {
+        try { fs.unlinkSync(wavPath); } catch {}
+      }
+    } else if (transcript.status === "processing") {
+      transcript.status = "completed";
+      await transcript.save();
     }
-  } else if (transcript.status === "processing") {
-    transcript.status = "completed";
-    await transcript.save();
-    await notifyTranscriptStatus(meetingId, "completed");
-  }
 
-  // Hand off notes generation to its own queue.
-  await enqueue("generateNotes", { meetingId });
+    // Hand off notes generation to its own queue.
+    await enqueue("generateNotes", { meetingId });
+  } catch (err) {
+    // A hard failure between upload and the notes handoff would otherwise
+    // leave notesStatus stuck at pending (blank card). Record it, then rethrow
+    // so SQS retries / eventually DLQs the message.
+    console.error(`[Finalize] Pipeline error for meeting ${meetingId}:`, err);
+    recording.status = "failed";
+    await recording.save().catch(() => {});
+    await markNotesStatus(meetingId, recording._id, "failed", "failed");
+    await notifyNotesStatus(meetingId, "failed");
+    throw err;
+  }
 
   cleanupLocalFiles(webmPaths, roomDir);
   console.log(`[Finalize] Completed for meeting ${meetingId}`);

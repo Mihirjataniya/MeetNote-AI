@@ -57,6 +57,25 @@ class MeetingService {
     displayName: string
   ): Promise<void> {
     try {
+      // Rejoin: if this user already has a row, reopen it (clear leftAt) instead
+      // of pushing a duplicate. One row per person for the whole meeting — the
+      // row keeps its original joinedAt and role (so a host stays host).
+      const reopened = await Meeting.updateOne(
+        { _id: meetingId, "participants.userId": userId },
+        { $unset: { "participants.$.leftAt": "" } }
+      );
+      if (reopened.matchedCount > 0) return;
+
+      // First time in this meeting — add a row. The meeting creator is the host;
+      // everyone else is a participant.
+      const meeting = await Meeting.findById(meetingId)
+        .select("createdBy")
+        .lean<{ createdBy: Types.ObjectId }>();
+      const role =
+        meeting && String(meeting.createdBy) === String(userId)
+          ? "host"
+          : "participant";
+
       await Meeting.updateOne(
         { _id: meetingId },
         {
@@ -65,7 +84,7 @@ class MeetingService {
               userId,
               displayName,
               joinedAt: new Date(),
-              role: "participant",
+              role,
             },
           },
         }

@@ -31,13 +31,6 @@ export function NotesBadge({ status }: { status: string | null }) {
       </span>
     );
   }
-  if (status === "generating") {
-    return (
-      <span className="shrink-0 px-2.5 py-[3px] rounded-full bg-amber-500/10 text-amber-400 text-[11px] font-medium">
-        Generating notes...
-      </span>
-    );
-  }
   if (status === "failed") {
     return (
       <span className="shrink-0 px-2.5 py-[3px] rounded-full bg-[#dc2626]/10 text-[#f87171] text-[11px] font-medium">
@@ -45,7 +38,23 @@ export function NotesBadge({ status }: { status: string | null }) {
       </span>
     );
   }
-  return null;
+  // No audio was captured (muted / very short meeting): nothing to transcribe.
+  // Neutral, not an error.
+  if (status === "skipped") {
+    return (
+      <span className="shrink-0 px-2.5 py-[3px] rounded-full bg-white/[0.06] text-tertiary text-[11px] font-medium">
+        No audio · no notes
+      </span>
+    );
+  }
+  // Everything still in flight — generating, pending, or a just-ended meeting
+  // whose transcript row doesn't exist yet (null). Never leave the card blank.
+  return (
+    <span className="shrink-0 inline-flex items-center gap-1.5 px-2.5 py-[3px] rounded-full bg-amber-500/10 text-amber-400 text-[11px] font-medium">
+      <Icon name="spinner" size={11} className="animate-spin" />
+      Processing notes…
+    </span>
+  );
 }
 
 async function downloadNotes(meetingId: string, title?: string) {

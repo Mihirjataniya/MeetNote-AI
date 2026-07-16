@@ -19,6 +19,9 @@ export const NOTES_STATUSES = [
   "generating",
   "completed",
   "failed",
+  // Terminal, non-error: nothing to summarize (no audio / empty transcript).
+  // Distinct from "failed" so the UI can show it neutrally, not as a crash.
+  "skipped",
 ] as const;
 
 export type NotesStatus = (typeof NOTES_STATUSES)[number];

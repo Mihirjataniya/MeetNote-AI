@@ -224,7 +224,7 @@ export interface TranscriptReadyPayload {
 
 export interface NotesReadyPayload {
   meetingId: string;
-  status: "generating" | "completed" | "failed";
+  status: "generating" | "completed" | "failed" | "skipped";
 }
 
 export type MeetingStateChangeKind =

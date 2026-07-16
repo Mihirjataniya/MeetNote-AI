@@ -113,7 +113,7 @@ export async function notifyTranscriptStatus(
 
 export async function notifyNotesStatus(
   meetingId: string,
-  status: "generating" | "completed" | "failed"
+  status: "generating" | "completed" | "failed" | "skipped"
 ): Promise<void> {
   try {
     const meeting = await Meeting.findById(meetingId)
@@ -134,8 +134,9 @@ export async function notifyNotesStatus(
       });
     }
 
-    // Only the terminal states create a persistent bell notification.
-    if (status === "generating") return;
+    // Only the real terminal states create a persistent bell notification.
+    // "skipped" (no audio) is a neutral non-event — live update only, no bell.
+    if (status === "generating" || status === "skipped") return;
 
     await createBulk(
       meeting.participants.map((p) => p.userId),

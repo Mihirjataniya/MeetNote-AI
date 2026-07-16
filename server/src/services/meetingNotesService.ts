@@ -18,8 +18,18 @@ class MeetingNotesService {
     }
 
     const transcript = await Transcript.findOne({ meetingId });
-    if (!transcript || !transcript.fullText) {
-      console.error(`[MeetingNotes] No completed transcript for meeting ${meetingId}`);
+    if (!transcript) {
+      console.error(`[MeetingNotes] No transcript for meeting ${meetingId}`);
+      return;
+    }
+    if (!transcript.fullText) {
+      // Transcription produced no text (silent/empty audio). Nothing to
+      // summarize — mark skipped so the UI shows a neutral state instead of
+      // hanging on "pending" forever.
+      console.warn(`[MeetingNotes] Empty transcript for meeting ${meetingId}, skipping notes`);
+      transcript.notesStatus = "skipped";
+      await transcript.save();
+      await notifyNotesStatus(meetingId, "skipped");
       return;
     }
 

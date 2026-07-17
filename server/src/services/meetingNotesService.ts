@@ -1,19 +1,12 @@
-import { GoogleGenerativeAI } from "@google/generative-ai";
-import { config } from "../config/index";
 import { Transcript } from "../models/Transcript";
 import { Meeting, type IMeeting } from "../models/Meeting";
 import { notifyNotesStatus } from "./notificationService";
+import { generateWithFallback, activeProviders } from "./llm/index";
 
 class MeetingNotesService {
-  private genAI: GoogleGenerativeAI;
-
-  constructor() {
-    this.genAI = new GoogleGenerativeAI(config.gemini.apiKey);
-  }
-
   async generate(meetingId: string): Promise<void> {
-    if (!config.gemini.apiKey) {
-      console.warn("[MeetingNotes] No GEMINI_API_KEY configured, skipping notes generation");
+    if (activeProviders().length === 0) {
+      console.warn("[MeetingNotes] No LLM provider configured (GEMINI_API_KEY / GROQ_API_KEY), skipping notes generation");
       return;
     }
 
@@ -46,7 +39,7 @@ class MeetingNotesService {
 
       const prompt = this.buildPrompt(transcript.fullText, meeting);
 
-      const markdown = await this.callWithRetry(prompt, 2);
+      const markdown = await generateWithFallback(prompt);
 
       transcript.meetingNotes = markdown;
       transcript.notesStatus = "completed";
@@ -63,29 +56,6 @@ class MeetingNotesService {
       // Rethrow so the SQS worker leaves the message for retry / DLQ.
       throw err;
     }
-  }
-
-  private async callWithRetry(prompt: string, maxRetries: number): Promise<string> {
-    const model = this.genAI.getGenerativeModel({ model: config.gemini.model });
-
-    for (let attempt = 0; attempt <= maxRetries; attempt++) {
-      try {
-        const result = await model.generateContent(prompt);
-        return result.response.text();
-      } catch (err: unknown) {
-        const status = (err as { status?: number }).status;
-        // 429 = rate limited, 503 = model overloaded — both transient, retry.
-        if ((status === 429 || status === 503) && attempt < maxRetries) {
-          const delayMs = (attempt + 1) * 40_000;
-          console.warn(`[MeetingNotes] Gemini ${status}, retrying in ${delayMs / 1000}s (attempt ${attempt + 1}/${maxRetries})`);
-          await new Promise((r) => setTimeout(r, delayMs));
-          continue;
-        }
-        throw err;
-      }
-    }
-
-    throw new Error("Unreachable");
   }
 
   private buildPrompt(

@@ -39,6 +39,10 @@ export const config = {
     apiKey: process.env.GEMINI_API_KEY || "",
     model: process.env.GEMINI_MODEL || "gemini-flash-latest",
   },
+  groq: {
+    apiKey: process.env.GROQ_API_KEY || "",
+    model: process.env.GROQ_MODEL || "openai/gpt-oss-120b",
+  },
   sqs: {
     region: process.env.AWS_REGION || "us-east-1",
     // Set for local emulators (ElasticMQ http://localhost:9324, LocalStack

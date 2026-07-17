@@ -33,7 +33,10 @@ async function markNotesStatus(
 // Seconds between drain re-checks while waiting for in-flight batches.
 const DRAIN_RETRY_DELAY_S = 15;
 // Cap the wait (~ attempts * delay) so a stuck batch can't loop forever.
-const MAX_DRAIN_ATTEMPTS = 40; // ~10 min
+// flushRoom's expectedBatchCount backstop means this ceiling is only hit on
+// genuine failures (Deepgram outage, lost message), so keep it tight enough
+// that best-effort notes still arrive in reasonable time.
+const MAX_DRAIN_ATTEMPTS = 20; // ~5 min
 
 // Finalize a meeting's recording once transcription has settled: confirm all
 // incremental batches landed (or run full-file fallback), upload audio to
@@ -168,7 +171,9 @@ function mergeToWav(webmPaths: string[], roomDir: string): Promise<string> {
     const args: string[] = [];
     for (const p of webmPaths) args.push("-i", p);
     if (webmPaths.length > 1) {
-      args.push("-filter_complex", `amix=inputs=${webmPaths.length}:duration=longest`);
+      // normalize=0 sums inputs instead of averaging (see transcribeBatch): keeps
+      // speech from being attenuated when quiet/silent participant tracks are mixed.
+      args.push("-filter_complex", `amix=inputs=${webmPaths.length}:duration=longest:normalize=0`);
     }
     args.push("-ac", "1", "-ar", "16000", "-y", outputPath);
 

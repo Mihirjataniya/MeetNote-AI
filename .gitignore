@@ -32,3 +32,6 @@ DEPLOYMENT.md
 
 server/recordings/
 
+# Deepgram debug script (throwaway)
+server/dgtest.mjs
+

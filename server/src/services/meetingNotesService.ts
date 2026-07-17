@@ -74,9 +74,10 @@ class MeetingNotesService {
         return result.response.text();
       } catch (err: unknown) {
         const status = (err as { status?: number }).status;
-        if (status === 429 && attempt < maxRetries) {
+        // 429 = rate limited, 503 = model overloaded — both transient, retry.
+        if ((status === 429 || status === 503) && attempt < maxRetries) {
           const delayMs = (attempt + 1) * 40_000;
-          console.warn(`[MeetingNotes] Rate limited, retrying in ${delayMs / 1000}s (attempt ${attempt + 1}/${maxRetries})`);
+          console.warn(`[MeetingNotes] Gemini ${status}, retrying in ${delayMs / 1000}s (attempt ${attempt + 1}/${maxRetries})`);
           await new Promise((r) => setTimeout(r, delayMs));
           continue;
         }

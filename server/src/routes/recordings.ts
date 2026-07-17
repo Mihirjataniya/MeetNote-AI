@@ -42,6 +42,9 @@ router.post("/upload", requireAuth, upload.single("audio"), (req, res) => {
   recordingService.addUploadedFile(roomId, req.file.path);
 
   if (chunkIndex != null && chunkStartMs != null) {
+    console.log(
+      `[Recording] Chunk ${chunkIndex} received for room ${roomId} (isFinal=${isFinal})`
+    );
     chunkTranscriptionService
       .onChunkReceived(
         roomId,

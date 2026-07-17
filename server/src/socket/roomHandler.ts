@@ -1,5 +1,6 @@
 import { Server, Socket } from "socket.io";
 import { Types } from "mongoose";
+import { config } from "../config/index";
 import { roomService } from "../services/roomService";
 import { meetingService } from "../services/meetingService";
 import { recordingService } from "../services/recordingService";
@@ -271,7 +272,9 @@ async function resolveScheduledHostUserId(
 
 export function registerRoomHandlers(io: TypedServer): void {
   io.on("connection", (socket: TypedSocket) => {
-    console.log(`Client connected: ${socket.id} (${socket.data.displayName})`);
+    if (config.nodeEnv !== "production") {
+      console.log(`Client connected: ${socket.id} (${socket.data.displayName})`);
+    }
     socket.data.rooms = new Set();
     socket.join(`user:${socket.data.userId}`);
 
@@ -652,7 +655,9 @@ export function registerRoomHandlers(io: TypedServer): void {
     });
 
     socket.on("disconnect", async (reason) => {
-      console.log(`Client disconnected: ${socket.id}, reason: ${reason}`);
+      if (config.nodeEnv !== "production") {
+        console.log(`Client disconnected: ${socket.id}, reason: ${reason}`);
+      }
 
       for (const roomId of socket.data.rooms) {
         const wasPending = roomService.removePendingRequest(roomId, socket.id);

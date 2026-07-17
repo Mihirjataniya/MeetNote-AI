@@ -1,6 +1,7 @@
 import { DeepgramClient } from "@deepgram/sdk";
 import { spawn } from "node:child_process";
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import { config } from "../../config/index";
 import { Transcript, type ITranscriptSegment } from "../../models/Transcript";
@@ -23,8 +24,15 @@ export async function handleTranscribeBatch(msg: TranscribeBatchMessage): Promis
 
   const existingPaths = webmPaths.filter((p) => fs.existsSync(p));
   if (existingPaths.length === 0) {
-    console.warn(`[TranscribeBatch] No source files for batch ${batchIndex} (room ${roomId}) — already cleaned up; skipping`);
-    // Record it as processed so finalize's drain check can complete.
+    // Normally means the room dir was already cleaned up. BUT: if this fires on
+    // every batch, this process is likely a rogue consumer on a machine that
+    // doesn't have the recording files (e.g. a dev box polling the prod queues
+    // — set SQS_WORKER_ENABLED=false / a dev SQS_QUEUE_PREFIX locally). It
+    // marks the batch processed with 0 segments, silently emptying the
+    // transcript for everyone sharing the DB.
+    console.error(
+      `[TranscribeBatch] No source files for batch ${batchIndex} (room ${roomId}) on host ${os.hostname()} — marking processed with 0 segments`
+    );
     await markProcessed(meetingId, batchIndex, isFinal, []);
     return;
   }
@@ -100,7 +108,11 @@ function mergeToWav(webmPaths: string[], outputDir: string, batchIndex: number):
     const args: string[] = [];
     for (const p of webmPaths) args.push("-i", p);
     if (webmPaths.length > 1) {
-      args.push("-filter_complex", `amix=inputs=${webmPaths.length}:duration=longest`);
+      // normalize=0 sums inputs instead of averaging them. Without it amix
+      // divides every input's volume by the input count, so mixing a speaker
+      // with silent/quiet participant tracks attenuates the speech (halved for
+      // 2 inputs, worse for more) until Deepgram returns 0 utterances.
+      args.push("-filter_complex", `amix=inputs=${webmPaths.length}:duration=longest:normalize=0`);
     }
     args.push("-ac", "1", "-ar", "16000", "-y", outputPath);
 

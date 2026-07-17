@@ -1,5 +1,6 @@
 import { Meeting } from "../models/Meeting";
 import { Recording } from "../models/Recording";
+import { Transcript } from "../models/Transcript";
 import { recordingService } from "./recordingService";
 import { enqueue } from "../queue/queues";
 
@@ -112,9 +113,29 @@ class ChunkTranscriptionService {
   // explicit final chunk), then drops the room's in-memory state.
   async flushRoom(roomId: string): Promise<void> {
     const batch = this.batches.get(roomId);
-    if (batch && batch.chunks.length > 0) {
-      batch.isFinal = true;
-      await this.sealBatch(roomId);
+    if (batch) {
+      if (batch.chunks.length > 0) {
+        batch.isFinal = true;
+        await this.sealBatch(roomId);
+      } else if (batch.batchIndex > 0) {
+        // Every chunk already sealed, but the client's final flag may never
+        // have registered (refresh/tab-close mid-meeting, empty final blob, or
+        // the last chunk instant-sealing before leave). Without a final batch,
+        // expectedBatchCount stays unset and finalize burns its whole
+        // drain-wait window. Backstop: the meeting is over, so the number of
+        // sealed batches IS the expected total — record it directly.
+        const recording = await Recording.findOne({ meetingId: batch.meetingId }).select("_id");
+        if (recording) {
+          await Transcript.updateOne(
+            { meetingId: batch.meetingId },
+            {
+              $setOnInsert: { recordingId: recording._id },
+              $max: { expectedBatchCount: batch.batchIndex },
+            },
+            { upsert: true }
+          );
+        }
+      }
     }
     this.batches.delete(roomId);
   }

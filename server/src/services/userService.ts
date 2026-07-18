@@ -68,11 +68,28 @@ class UserService {
     currentPassword: string,
     newPassword: string
   ): Promise<void> {
-    if (typeof newPassword !== "string" || newPassword.length < 6) {
-      throw new UserServiceError(400, "New password must be at least 6 characters");
+    if (
+      typeof newPassword !== "string" ||
+      newPassword.length < 8 ||
+      !/[a-zA-Z]/.test(newPassword) ||
+      !/[0-9]/.test(newPassword)
+    ) {
+      throw new UserServiceError(
+        400,
+        "New password must be at least 8 characters and include a letter and a number"
+      );
     }
     const user = await User.findById(userId);
     if (!user) throw new UserServiceError(404, "User not found");
+
+    // Google-only account has no password to verify/replace.
+    if (!user.password) {
+      throw new UserServiceError(
+        400,
+        "This account uses Google sign-in and has no password",
+        "NO_PASSWORD"
+      );
+    }
 
     const ok = await bcrypt.compare(currentPassword ?? "", user.password);
     if (!ok) {

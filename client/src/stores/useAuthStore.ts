@@ -3,6 +3,7 @@ import { subscribeWithSelector } from "zustand/middleware";
 import {
   registerUser,
   loginUser,
+  googleLogin,
   fetchMe,
   getStoredToken,
   storeToken,
@@ -22,6 +23,7 @@ interface AuthStore {
     password: string,
     displayName: string
   ) => Promise<void>;
+  loginWithGoogle: (idToken: string) => Promise<void>;
   logout: () => void;
   setUser: (user: AuthUser) => void;
   refreshUser: () => Promise<void>;
@@ -56,6 +58,13 @@ export const useAuthStore = create<AuthStore>()(
     register: async (email, password, displayName) => {
       set({ error: null });
       const res = await registerUser(email, password, displayName);
+      storeToken(res.token);
+      set({ token: res.token, user: res.user });
+    },
+
+    loginWithGoogle: async (idToken) => {
+      set({ error: null });
+      const res = await googleLogin(idToken);
       storeToken(res.token);
       set({ token: res.token, user: res.user });
     },

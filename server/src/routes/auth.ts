@@ -97,6 +97,33 @@ router.post("/login", async (req, res) => {
   }
 });
 
+router.post("/google", async (req, res) => {
+  try {
+    const { idToken } = req.body as { idToken?: string };
+    if (!idToken || typeof idToken !== "string") {
+      res.status(400).json({ message: "idToken is required" });
+      return;
+    }
+
+    const { user, token } = await authService.loginWithGoogle(idToken);
+
+    const response: AuthResponse = {
+      token,
+      user: {
+        id: user._id.toString(),
+        email: user.email,
+        displayName: user.displayName,
+        createdAt: user.createdAt.toISOString(),
+      },
+    };
+    res.json(response);
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : "Google sign-in failed";
+    res.status(401).json({ message });
+  }
+});
+
 router.get("/me", requireAuth, async (req, res) => {
   // Fetch from DB so profile updates are reflected without re-issuing the JWT.
   try {

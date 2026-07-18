@@ -24,6 +24,9 @@ export const config = {
     secret: process.env.JWT_SECRET || "dev-secret-change-in-production",
     expiresIn: process.env.JWT_EXPIRES_IN || "7d" as const,
   },
+  google: {
+    clientId: process.env.GOOGLE_CLIENT_ID || "",
+  },
   recordings: {
     dir: path.join(path.dirname(fileURLToPath(import.meta.url)), "../../recordings"),
   },

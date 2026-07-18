@@ -1,10 +1,15 @@
 import { Schema, model } from "mongoose";
 import type { Document, Types } from "mongoose";
 
+export type AuthProvider = "password" | "google";
+
 export interface IUser extends Document {
   _id: Types.ObjectId;
   email: string;
-  password: string;
+  // Optional: Google-only accounts never set a password.
+  password?: string;
+  googleId?: string;
+  authProvider: AuthProvider;
   displayName: string;
   createdAt: Date;
 }
@@ -19,7 +24,17 @@ const userSchema = new Schema<IUser>({
   },
   password: {
     type: String,
-    required: true,
+  },
+  // sparse: many docs may lack googleId, but those that have it stay unique.
+  googleId: {
+    type: String,
+    unique: true,
+    sparse: true,
+  },
+  authProvider: {
+    type: String,
+    enum: ["password", "google"],
+    default: "password",
   },
   displayName: {
     type: String,

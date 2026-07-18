@@ -1,6 +1,9 @@
 import { useEffect, useState } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
+import { GoogleLogin } from "@react-oauth/google";
 import { useAuthStore } from "../stores/useAuthStore";
+
+const GOOGLE_ENABLED = Boolean(import.meta.env.VITE_GOOGLE_CLIENT_ID);
 
 function Logo() {
   return (
@@ -135,6 +138,7 @@ function SidePanel({ side }: { side: "left" | "right" }) {
 export function AuthPage() {
   const login = useAuthStore((s) => s.login);
   const register = useAuthStore((s) => s.register);
+  const loginWithGoogle = useAuthStore((s) => s.loginWithGoogle);
   const error = useAuthStore((s) => s.error);
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
@@ -152,6 +156,16 @@ export function AuthPage() {
   const pwHasLetter = /[a-zA-Z]/.test(password);
   const pwHasNumber = /[0-9]/.test(password);
   const passwordValid = pwLongEnough && pwHasLetter && pwHasNumber;
+
+  // Auth succeeded. If the guest arrived from a protected link (e.g. a meeting
+  // URL), send them back there. Only honor internal paths to avoid an
+  // open-redirect. No param → fall through to the default dashboard.
+  const finishAuth = () => {
+    const redirect = searchParams.get("redirect");
+    if (redirect && redirect.startsWith("/") && !redirect.startsWith("//")) {
+      navigate(redirect, { replace: true });
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -171,15 +185,27 @@ export function AuthPage() {
         }
         await register(email, password, displayName);
       }
-      // Auth succeeded. If the guest arrived from a protected link (e.g. a
-      // meeting URL), send them back there. Only honor internal paths to avoid
-      // an open-redirect. No param → fall through to the default dashboard.
-      const redirect = searchParams.get("redirect");
-      if (redirect && redirect.startsWith("/") && !redirect.startsWith("//")) {
-        navigate(redirect, { replace: true });
-      }
+      finishAuth();
     } catch (err) {
       const message = err instanceof Error ? err.message : "Something went wrong";
+      setLocalError(message);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleGoogle = async (credential?: string) => {
+    if (!credential) {
+      setLocalError("Google sign-in failed. Try again.");
+      return;
+    }
+    setLocalError(null);
+    setSubmitting(true);
+    try {
+      await loginWithGoogle(credential);
+      finishAuth();
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Google sign-in failed";
       setLocalError(message);
     } finally {
       setSubmitting(false);
@@ -208,7 +234,27 @@ export function AuthPage() {
                 : "Set up your workspace in seconds."}
             </p>
 
-            <form onSubmit={handleSubmit} className="mt-7">
+            {GOOGLE_ENABLED && (
+              <div className="mt-7">
+                <div className="flex justify-center [color-scheme:light]">
+                  <GoogleLogin
+                    onSuccess={(cred) => handleGoogle(cred.credential)}
+                    onError={() => setLocalError("Google sign-in failed. Try again.")}
+                    text={mode === "login" ? "signin_with" : "signup_with"}
+                    width="360"
+                  />
+                </div>
+                <div className="flex items-center gap-3 mt-6">
+                  <div className="flex-1 h-px bg-border" />
+                  <span className="text-[12px] text-tertiary">
+                    or continue with email
+                  </span>
+                  <div className="flex-1 h-px bg-border" />
+                </div>
+              </div>
+            )}
+
+            <form onSubmit={handleSubmit} className={GOOGLE_ENABLED ? "mt-6" : "mt-7"}>
               {mode === "register" && (
                 <div className="mb-3.5">
                   <label className="text-[12px] font-medium text-secondary block mb-2">

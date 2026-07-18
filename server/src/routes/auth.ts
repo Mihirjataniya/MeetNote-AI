@@ -18,10 +18,16 @@ router.post("/register", async (req, res) => {
       res.status(400).json({ message: "Valid email is required" });
       return;
     }
-    if (!password || typeof password !== "string" || password.length < 6) {
+    if (!password || typeof password !== "string" || password.length < 8) {
       res
         .status(400)
-        .json({ message: "Password must be at least 6 characters" });
+        .json({ message: "Password must be at least 8 characters" });
+      return;
+    }
+    if (!/[a-zA-Z]/.test(password) || !/[0-9]/.test(password)) {
+      res.status(400).json({
+        message: "Password must contain at least one letter and one number",
+      });
       return;
     }
     if (

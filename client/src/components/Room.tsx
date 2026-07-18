@@ -19,7 +19,7 @@ export interface RoomProps {
   muteTrack: (kind: "audio" | "video", muted: boolean) => void;
   startScreenShare: () => void;
   stopScreenShare: () => void;
-  leaveRoom: () => void;
+  leaveRoom: () => void | Promise<void>;
 }
 
 function formatElapsed(seconds: number): string {
@@ -70,6 +70,7 @@ export function Room({
   const preferredCamOn = useRoomStore((s) => s.preferredCamOn);
   const [micOn, setMicOn] = useState(preferredMicOn);
   const [camOn, setCamOn] = useState(preferredCamOn);
+  const [leaving, setLeaving] = useState(false);
 
   const handleToggleCam = useCallback(() => {
     if (!localStream) {
@@ -160,8 +161,16 @@ export function Room({
     }
   };
 
-  const handleLeave = () => {
-    leaveRoom();
+  const handleLeave = async () => {
+    if (leaving) return;
+    setLeaving(true);
+    try {
+      await leaveRoom();
+    } catch {
+      // Leave failed (e.g. final chunk upload) — re-enable so user can retry.
+      setLeaving(false);
+    }
+    // On success the room unmounts, so no need to reset `leaving`.
   };
 
   const isVertical = dockEdge === "left" || dockEdge === "right";
@@ -451,10 +460,18 @@ export function Room({
           {/* Leave */}
           <button
             onClick={handleLeave}
-            className={`${isVertical ? "w-10 h-10 sm:w-11 sm:h-11" : "h-10 sm:h-11 px-3.5 sm:px-5"} rounded-full bg-[#dc2626] hover:bg-[#b91c1c] text-white font-medium text-[13px] inline-flex items-center justify-center gap-2 transition-colors active:scale-95`}
+            disabled={leaving}
+            title={leaving ? "Leaving…" : "Leave"}
+            className={`${isVertical ? "w-10 h-10 sm:w-11 sm:h-11" : "h-10 sm:h-11 px-3.5 sm:px-5"} rounded-full bg-[#dc2626] hover:bg-[#b91c1c] text-white font-medium text-[13px] inline-flex items-center justify-center gap-2 transition-colors active:scale-95 disabled:opacity-70 disabled:cursor-not-allowed disabled:active:scale-100`}
           >
-            <Icon name="phone" size={16} style={{ transform: "rotate(135deg)" }} />
-            {!isVertical && <span className="hidden sm:inline">Leave</span>}
+            {leaving ? (
+              <Icon name="spinner" size={16} className="animate-spin" />
+            ) : (
+              <Icon name="phone" size={16} style={{ transform: "rotate(135deg)" }} />
+            )}
+            {!isVertical && (
+              <span className="hidden sm:inline">{leaving ? "Leaving…" : "Leave"}</span>
+            )}
           </button>
         </div>
       </div>

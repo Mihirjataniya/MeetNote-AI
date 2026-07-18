@@ -129,7 +129,7 @@ export function MeetingRow({ m }: { m: MeetingSummary }) {
             {downloadingNotes ? (
               <Icon name="spinner" size={14} className="animate-spin" />
             ) : (
-              <Icon name="sparkle" size={14} />
+              <Icon name="download" size={14} />
             )}
           </button>
         )}

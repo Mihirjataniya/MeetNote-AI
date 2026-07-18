@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useSearchParams, useNavigate } from "react-router-dom";
 import { useAuthStore } from "../stores/useAuthStore";
 
 function Logo() {
@@ -18,6 +18,21 @@ function ArrowRightIcon() {
     <svg width={13} height={13} viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
       <path d="M4 10h12M11 5l5 5-5 5" />
     </svg>
+  );
+}
+
+function PwReq({ ok, label }: { ok: boolean; label: string }) {
+  return (
+    <span
+      className="inline-flex items-center gap-1 text-[12px] transition-colors"
+      style={{ color: ok ? "var(--color-foreground)" : "var(--color-tertiary)" }}
+    >
+      <span
+        className="w-1.5 h-1.5 rounded-full transition-colors"
+        style={{ background: ok ? "var(--color-foreground)" : "var(--color-border-strong)" }}
+      />
+      {label}
+    </span>
   );
 }
 
@@ -122,6 +137,7 @@ export function AuthPage() {
   const register = useAuthStore((s) => s.register);
   const error = useAuthStore((s) => s.error);
   const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
   const [mode, setMode] = useState<"login" | "register">(
     searchParams.get("mode") === "register" ? "register" : "login",
   );
@@ -132,6 +148,11 @@ export function AuthPage() {
   const [submitting, setSubmitting] = useState(false);
   const [localError, setLocalError] = useState<string | null>(null);
 
+  const pwLongEnough = password.length >= 8;
+  const pwHasLetter = /[a-zA-Z]/.test(password);
+  const pwHasNumber = /[0-9]/.test(password);
+  const passwordValid = pwLongEnough && pwHasLetter && pwHasNumber;
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLocalError(null);
@@ -141,7 +162,21 @@ export function AuthPage() {
       if (mode === "login") {
         await login(email, password);
       } else {
+        if (!passwordValid) {
+          setLocalError(
+            "Password must be at least 8 characters and include a letter and a number.",
+          );
+          setSubmitting(false);
+          return;
+        }
         await register(email, password, displayName);
+      }
+      // Auth succeeded. If the guest arrived from a protected link (e.g. a
+      // meeting URL), send them back there. Only honor internal paths to avoid
+      // an open-redirect. No param → fall through to the default dashboard.
+      const redirect = searchParams.get("redirect");
+      if (redirect && redirect.startsWith("/") && !redirect.startsWith("//")) {
+        navigate(redirect, { replace: true });
       }
     } catch (err) {
       const message = err instanceof Error ? err.message : "Something went wrong";
@@ -219,15 +254,17 @@ export function AuthPage() {
                 <input
                   type="password"
                   className="w-full h-10 px-3 border border-border-strong bg-surface rounded-[10px] text-[14px] text-foreground outline-none transition-all duration-150 focus:border-border-focused focus:shadow-[0_0_0_4px_rgba(0,0,0,0.04)] dark:focus:shadow-[0_0_0_4px_rgba(255,255,255,0.04)] placeholder:text-tertiary"
-                  placeholder={mode === "login" ? "••••••••" : "At least 6 characters"}
+                  placeholder={mode === "login" ? "••••••••" : "At least 8 characters"}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  minLength={6}
+                  minLength={mode === "register" ? 8 : undefined}
                   required
                 />
                 {mode === "register" && (
-                  <div className="text-[12px] text-tertiary mt-1.5">
-                    Use a passphrase you'll remember.
+                  <div className="flex flex-wrap gap-x-3 gap-y-1 mt-2">
+                    <PwReq ok={pwLongEnough} label="8+ characters" />
+                    <PwReq ok={pwHasLetter} label="a letter" />
+                    <PwReq ok={pwHasNumber} label="a number" />
                   </div>
                 )}
               </div>

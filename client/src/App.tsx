@@ -1,5 +1,5 @@
 import "./styles/index.css";
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { queryClient } from "./queries/queryClient";
 import { useAuthStore } from "./stores/useAuthStore";
@@ -16,6 +16,17 @@ import { ProfilePage } from "./pages/ProfilePage";
 import { MeetingPage } from "./pages/MeetingPage";
 
 useAuthStore.getState().hydrate();
+
+// A guest hit a protected path (e.g. a /room/:id meeting link). Send them
+// straight to sign-in, remembering where they were headed so AuthPage can
+// bounce them back after auth — instead of dumping them on the landing page.
+function SigninRedirect() {
+  const location = useLocation();
+  const target = location.pathname + location.search;
+  return (
+    <Navigate to={`/signin?redirect=${encodeURIComponent(target)}`} replace />
+  );
+}
 
 function AppRoutes() {
   const user = useAuthStore((s) => s.user);
@@ -42,7 +53,7 @@ function AppRoutes() {
       <Routes>
         <Route path="/" element={<LandingPage />} />
         <Route path="/signin" element={<AuthPage />} />
-        <Route path="*" element={<Navigate to="/" replace />} />
+        <Route path="*" element={<SigninRedirect />} />
       </Routes>
     );
   }

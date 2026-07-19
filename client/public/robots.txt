@@ -1,0 +1,9 @@
+User-agent: *
+Allow: /$
+Allow: /index.html
+
+# Meeting rooms are private/ephemeral — keep them out of the index
+Disallow: /room/
+Disallow: /api/
+
+Sitemap: https://meet-note-ai.vercel.app/sitemap.xml

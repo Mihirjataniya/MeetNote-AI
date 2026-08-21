@@ -391,6 +391,63 @@
   }
 }
 
+/* Hero spotlights — a wide conic cone per top corner, aimed at the centre of the
+   hero (~129deg / 231deg, i.e. 51deg off vertical). Two layers each: a hot glow
+   at the lamp itself, and the cone of light spreading out from it. The cone is
+   deliberately broad with a flat core and long shoulders — a narrow one reads as
+   a drawn line, not as light. */
+.hero-spot {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.9;
+  filter: blur(56px);
+  /* Additive over the dark hero, so the beams glow instead of sitting on top. */
+  mix-blend-mode: screen;
+}
+.hero-spot-l {
+  background:
+    radial-gradient(
+      42% 42% at 0% 0%,
+      color-mix(in oklab, var(--foreground) 22%, transparent),
+      transparent 72%
+    ),
+    conic-gradient(
+      from 0deg at 0% 0%,
+      transparent 96deg,
+      color-mix(in oklab, var(--foreground) 3%, transparent) 108deg,
+      color-mix(in oklab, var(--foreground) 12%, transparent) 118deg,
+      color-mix(in oklab, var(--foreground) 20%, transparent) 126deg,
+      color-mix(in oklab, var(--foreground) 20%, transparent) 133deg,
+      color-mix(in oklab, var(--foreground) 12%, transparent) 141deg,
+      color-mix(in oklab, var(--foreground) 3%, transparent) 151deg,
+      transparent 163deg
+    );
+  /* Light falls off hard with distance and dies before the two beams meet. */
+  -webkit-mask-image: radial-gradient(88% 88% at 0% 0%, #000 0%, rgba(0, 0, 0, 0.5) 34%, rgba(0, 0, 0, 0.16) 62%, transparent 86%);
+  mask-image: radial-gradient(88% 88% at 0% 0%, #000 0%, rgba(0, 0, 0, 0.5) 34%, rgba(0, 0, 0, 0.16) 62%, transparent 86%);
+}
+.hero-spot-r {
+  background:
+    radial-gradient(
+      42% 42% at 100% 0%,
+      color-mix(in oklab, var(--foreground) 22%, transparent),
+      transparent 72%
+    ),
+    conic-gradient(
+      from 0deg at 100% 0%,
+      transparent 197deg,
+      color-mix(in oklab, var(--foreground) 3%, transparent) 209deg,
+      color-mix(in oklab, var(--foreground) 12%, transparent) 219deg,
+      color-mix(in oklab, var(--foreground) 20%, transparent) 227deg,
+      color-mix(in oklab, var(--foreground) 20%, transparent) 234deg,
+      color-mix(in oklab, var(--foreground) 12%, transparent) 242deg,
+      color-mix(in oklab, var(--foreground) 3%, transparent) 252deg,
+      transparent 264deg
+    );
+  -webkit-mask-image: radial-gradient(88% 88% at 100% 0%, #000 0%, rgba(0, 0, 0, 0.5) 34%, rgba(0, 0, 0, 0.16) 62%, transparent 86%);
+  mask-image: radial-gradient(88% 88% at 100% 0%, #000 0%, rgba(0, 0, 0, 0.5) 34%, rgba(0, 0, 0, 0.16) 62%, transparent 86%);
+}
 /* Infinite marquee for the logo wall (paused on hover). */
 .marquee-mask {
   -webkit-mask: linear-gradient(
@@ -447,6 +504,16 @@
   }
   to {
     stroke-dashoffset: 0;
+  }
+}
+
+/* Travelling dashes on the architecture diagram — inline-styled animations
+   can't be caught by a media query, so kill them by class here. */
+@media (prefers-reduced-motion: reduce) {
+  .arch-ray {
+    animation: none !important;
+    stroke-dasharray: none !important;
+    opacity: 0;
   }
 }
 

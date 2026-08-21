@@ -257,22 +257,34 @@ function Hero() {
   const nav = useNavigate();
   return (
     <section className={`${SHELL} relative pt-16 pb-14 md:pt-[88px] md:pb-16`}>
-      {/* Decorative aurora blobs drifting behind the headline. */}
-      <div className="hero-aura left-[-6%] top-[2%] h-[340px] w-[340px]" aria-hidden />
+      {/* Spotlights thrown in from the two top corners of the viewport toward the
+          centre. Full-bleed wrapper (the section itself is container-width), clipped
+          so the page never scrolls sideways, and separate from HeroRays so that
+          SVG keeps its overflow. */}
       <div
-        className="hero-aura right-[8%] top-[26%] h-[280px] w-[280px]"
+        className="pointer-events-none absolute inset-y-0 left-1/2 w-screen -translate-x-1/2 overflow-hidden"
+        aria-hidden
+      >
+        <div className="hero-spot hero-spot-l" />
+        <div className="hero-spot hero-spot-r" />
+      </div>
+
+      {/* Decorative aurora blobs drifting behind the headline. */}
+      <div className="hero-aura left-[12%] top-[-4%] h-[340px] w-[340px]" aria-hidden />
+      <div
+        className="hero-aura right-[14%] top-[18%] h-[280px] w-[280px]"
         style={{ animationDelay: "-6s" }}
         aria-hidden
       />
 
-      <div className="relative grid items-center gap-10 lg:grid-cols-[minmax(0,420px)_1fr] lg:gap-12">
-        {/* Text column */}
-        <div>
+      <div className="relative">
+        {/* Copy — centered, stacked above the product visual. */}
+        <div className="mx-auto max-w-[860px] text-center">
           <h1
-            className="max-w-[620px] font-display font-semibold text-foreground"
+            className="font-display font-semibold text-foreground"
             style={{
-              fontSize: "clamp(40px, 6vw, 68px)",
-              lineHeight: 1.0,
+              fontSize: "clamp(40px, 7vw, 76px)",
+              lineHeight: 1.02,
               letterSpacing: "-0.035em",
             }}
           >
@@ -286,7 +298,7 @@ function Hero() {
           <p
             data-reveal
             style={{ transitionDelay: "0.08s" }}
-            className="mt-6 max-w-[520px] text-[16px] leading-[1.55] text-secondary md:text-[18px]"
+            className="mx-auto mt-6 max-w-[620px] text-[16px] leading-[1.55] text-secondary md:text-[18px]"
           >
             MeetNote Ai captures every meeting, writes the notes you'd write
             yourself, and files them where your team will actually find them.
@@ -296,7 +308,7 @@ function Hero() {
           <div
             data-reveal
             style={{ transitionDelay: "0.16s" }}
-            className="mt-8 flex flex-wrap gap-2.5"
+            className="mt-8 flex flex-wrap justify-center gap-2.5"
           >
             <Btn
               variant="primary"
@@ -311,9 +323,12 @@ function Hero() {
           </div>
         </div>
 
-        {/* Product visual — live call → AI processing → PDF summary.
-            Bleeds to the right viewport edge on large screens for scale. */}
-        <div className="relative origin-left overflow-hidden lg:-mr-14 lg:scale-[1.06]">
+        {/* Product visual — live call → AI processing → PDF summary. */}
+        <div
+          data-reveal
+          style={{ transitionDelay: "0.24s" }}
+          className="relative mx-auto mt-14 w-full max-w-[1080px] md:mt-16"
+        >
           <img
             src={IMG.hero}
             alt="A MeetNote Ai video call is recorded, processed by AI, and turned into a PDF meeting summary."
@@ -480,6 +495,545 @@ function NotesShowcase() {
 }
 
 
+
+/* ------------------------------------------------------------------ *
+ * Architecture diagram — the real path a meeting takes through the
+ * system, drawn once in a 1260x380 viewBox so every label, box and ray
+ * scales together. Same animated-ray trick as the hero graphic.
+ * ------------------------------------------------------------------ */
+
+type ArchShape = "window" | "box" | "queue" | "cylinder";
+
+type ArchNode = {
+  id: string;
+  shape: ArchShape;
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  t: string;
+  cap: string[];
+  tag?: string;
+};
+
+/* Trust boundaries. Everything inside one dashed box runs in the same place and
+   fails together, which is the thing a plain flow chart can't show. */
+const ARCH_ZONES: { label: string; x: number; y: number; w: number; h: number }[] = [
+  { label: "Client", x: 40, y: 60, w: 380, h: 250 },
+  { label: "Real-time edge", x: 470, y: 60, w: 460, h: 250 },
+  { label: "Async pipeline — runs after the call", x: 150, y: 370, w: 1090, h: 230 },
+  { label: "Data", x: 340, y: 660, w: 560, h: 130 },
+];
+
+const ARCH_NODES: ArchNode[] = [
+  {
+    id: "client",
+    shape: "window",
+    x: 80,
+    y: 110,
+    w: 300,
+    h: 120,
+    t: "Browser",
+    cap: ["Records its own microphone in short", "chunks — capture never leaves the tab"],
+    tag: "× N",
+  },
+  {
+    id: "gateway",
+    shape: "box",
+    x: 510,
+    y: 104,
+    w: 380,
+    h: 64,
+    t: "Signalling gateway",
+    cap: [],
+  },
+  {
+    id: "media",
+    shape: "box",
+    x: 510,
+    y: 190,
+    w: 380,
+    h: 64,
+    t: "Media relay",
+    cap: ["Forwards streams between peers. Nothing", "joins the call and nothing records it."],
+  },
+  {
+    id: "broker",
+    shape: "queue",
+    x: 200,
+    y: 420,
+    w: 200,
+    h: 96,
+    t: "Message broker",
+    cap: ["One job per stage,", "retried on failure"],
+  },
+  {
+    id: "stt",
+    shape: "box",
+    x: 470,
+    y: 420,
+    w: 220,
+    h: 96,
+    t: "Speech-to-text",
+    cap: ["Chunks stitched into one", "speaker-labelled transcript"],
+  },
+  {
+    id: "store",
+    shape: "cylinder",
+    x: 740,
+    y: 414,
+    w: 160,
+    h: 108,
+    t: "Object store",
+    cap: ["Archived audio"],
+  },
+  {
+    id: "llm",
+    shape: "box",
+    x: 960,
+    y: 420,
+    w: 220,
+    h: 96,
+    t: "LLM",
+    cap: ["Drafts summary, decisions", "and action items"],
+  },
+  {
+    id: "db",
+    shape: "cylinder",
+    x: 390,
+    y: 686,
+    w: 200,
+    h: 88,
+    t: "Database",
+    cap: [],
+  },
+  {
+    id: "export",
+    shape: "box",
+    x: 650,
+    y: 698,
+    w: 210,
+    h: 64,
+    t: "PDF export",
+    cap: [],
+  },
+];
+
+/* Edges carry their protocol, the way an architecture doc would. Solid means it
+   happens while you are in the call; dashed means it happens afterwards. */
+type ArchEdge = {
+  d: string;
+  label: string;
+  lx: number;
+  ly: number;
+  async?: boolean;
+  dur: number;
+  delay: number;
+};
+
+const ARCH_EDGES: ArchEdge[] = [
+  { d: "M 380 148 C 440 148, 450 136, 510 136", label: "WebSocket · JWT", lx: 445, ly: 118, dur: 2.2, delay: -0.2 },
+  { d: "M 380 200 C 440 200, 450 222, 510 222", label: "WebRTC · SRTP", lx: 445, ly: 244, dur: 2.0, delay: -1.1 },
+  {
+    d: "M 700 254 C 700 340, 300 330, 300 420",
+    label: "enqueued when the last participant leaves",
+    lx: 520,
+    ly: 338,
+    async: true,
+    dur: 3.4,
+    delay: -0.7,
+  },
+  { d: "M 400 468 L 470 468", label: "batch", lx: 435, ly: 450, async: true, dur: 2.0, delay: -1.6 },
+  { d: "M 690 468 L 740 468", label: "audio", lx: 715, ly: 450, async: true, dur: 2.0, delay: -0.5 },
+  { d: "M 900 468 L 960 468", label: "transcript", lx: 930, ly: 450, async: true, dur: 2.0, delay: -1.3 },
+  {
+    d: "M 1070 516 C 1070 640, 720 616, 490 686",
+    label: "persist",
+    lx: 830,
+    ly: 634,
+    async: true,
+    dur: 3.2,
+    delay: -0.9,
+  },
+  { d: "M 590 730 L 650 730", label: "render", lx: 620, ly: 712, async: true, dur: 2.0, delay: -2.0 },
+  {
+    d: "M 390 730 C 230 742, 80 720, 80 430 C 80 300, 140 250, 228 232",
+    label: "notes + PDF · HTTPS",
+    lx: 98,
+    ly: 636,
+    async: true,
+    dur: 4.2,
+    delay: -0.3,
+  },
+];
+
+/* A chip behind each edge label, so the connector never runs through the text. */
+function EdgeLabel({ x, y, text }: { x: number; y: number; text: string }) {
+  const w = text.length * 5.9 + 16;
+  return (
+    <g>
+      <rect x={x - w / 2} y={y - 11} width={w} height={20} rx={6} fill="var(--background)" />
+      <text
+        x={x}
+        y={y + 3}
+        textAnchor="middle"
+        fill="var(--tertiary)"
+        fontFamily="var(--font-mono)"
+        fontSize={11}
+      >
+        {text}
+      </text>
+    </g>
+  );
+}
+
+/* Each component is drawn as the symbol it is — a window, a queue with slots, a
+   cylinder — instead of one generic card with an icon dropped into it. */
+function ArchShapeNode({ node }: { node: ArchNode }) {
+  const { shape, x, y, w, h } = node;
+  const cx = x + w / 2;
+  const ry = 14;
+
+  const outline =
+    shape === "cylinder" ? (
+      <>
+        <path
+          d={`M ${x} ${y + ry} V ${y + h - ry} a ${w / 2} ${ry} 0 0 0 ${w} 0 V ${y + ry}`}
+          fill="var(--surface)"
+          stroke="var(--border-strong)"
+        />
+        <ellipse cx={cx} cy={y + ry} rx={w / 2} ry={ry} fill="var(--surface-hover)" stroke="var(--border-strong)" />
+      </>
+    ) : (
+      <>
+        <rect x={x} y={y} width={w} height={h} rx={12} fill="var(--surface)" stroke="var(--border-strong)" />
+        {shape === "window" && (
+          <>
+            <path d={`M ${x} ${y + 30} H ${x + w}`} stroke="var(--border-strong)" />
+            <path
+              d={`M ${x + 18} ${y + 15} h 0.01 M ${x + 32} ${y + 15} h 0.01 M ${x + 46} ${y + 15} h 0.01`}
+              stroke="var(--muted)"
+              strokeWidth={3.5}
+              strokeLinecap="round"
+            />
+          </>
+        )}
+        {shape === "queue" && (
+          <>
+            <path d={`M ${x + 16} ${y + 34} H ${x + w - 16}`} stroke="var(--border-strong)" />
+            {[0.34, 0.5, 0.66].map((f) => (
+              <path key={f} d={`M ${x + w * f} ${y + 34} V ${y + h - 16}`} stroke="var(--border-strong)" />
+            ))}
+          </>
+        )}
+      </>
+    );
+
+  /* The title sits under the lid of a cylinder, and centred everywhere else. */
+  const titleY =
+    shape === "cylinder"
+      ? y + h / 2 + 12
+      : shape === "window"
+        ? y + 30 + (h - 30) / 2 + 6
+        : y + h / 2 + 6;
+
+  return (
+    <g>
+      <g fill="none" strokeWidth={1.25}>
+        {outline}
+      </g>
+
+      <text
+        x={cx}
+        y={titleY}
+        textAnchor="middle"
+        fill="var(--foreground)"
+        fontFamily="var(--font-display)"
+        fontSize={17}
+        fontWeight={600}
+        letterSpacing="-0.01em"
+      >
+        {node.t}
+      </text>
+
+      {node.tag && (
+        <>
+          <rect x={x + w - 60} y={y + 44} width={44} height={22} rx={7} fill="var(--hover)" />
+          <text
+            x={x + w - 38}
+            y={y + 59}
+            textAnchor="middle"
+            fill="var(--secondary)"
+            fontFamily="var(--font-mono)"
+            fontSize={11}
+          >
+            {node.tag}
+          </text>
+        </>
+      )}
+
+      {node.cap.map((line, i) => (
+        <text key={i} x={cx} y={y + h + 24 + i * 18} textAnchor="middle" fill="var(--tertiary)" fontSize={12.5}>
+          {line}
+        </text>
+      ))}
+    </g>
+  );
+}
+
+function ArchDiagram() {
+  const ray = (dur: number, delay: number): CSSProperties => ({
+    strokeDasharray: RAY_DASH,
+    animation: `rayflow ${dur}s linear infinite`,
+    animationDelay: `${delay}s`,
+  });
+
+  return (
+    <svg
+      viewBox="0 0 1280 830"
+      className="block h-auto w-full min-w-[960px]"
+      role="img"
+      aria-label="Architecture diagram. In the client zone, each browser records its own microphone. Over WebSocket and WebRTC it reaches the real-time edge: a signalling gateway and a media relay. When the last participant leaves, work is enqueued to the async pipeline, where a message broker feeds speech-to-text, an object store, and an LLM. Results are persisted to the database, rendered to PDF, and returned to the browser over HTTPS."
+    >
+      <defs>
+        <marker
+          id="arch-arrow"
+          viewBox="0 0 8 8"
+          refX={6.5}
+          refY={4}
+          markerWidth={6}
+          markerHeight={6}
+          orient="auto-start-reverse"
+        >
+          <path d="M 1 1 L 6 4 L 1 7" fill="none" stroke="var(--border-focused)" strokeWidth={1.5} />
+        </marker>
+      </defs>
+
+      {/* Trust boundaries */}
+      {ARCH_ZONES.map((z) => (
+        <g key={z.label}>
+          <rect
+            x={z.x}
+            y={z.y}
+            width={z.w}
+            height={z.h}
+            rx={18}
+            fill="var(--hover)"
+            fillOpacity={0.35}
+            stroke="var(--border)"
+            strokeWidth={1}
+            strokeDasharray="6 6"
+          />
+          <text
+            x={z.x + 20}
+            y={z.y + 26}
+            fill="var(--muted)"
+            fontFamily="var(--font-mono)"
+            fontSize={11}
+            letterSpacing="0.14em"
+          >
+            {z.label.toUpperCase()}
+          </text>
+        </g>
+      ))}
+
+      {/* Connector rails — dashed ones only happen once the call has ended. */}
+      <g fill="none" stroke="var(--border-strong)" strokeWidth={1.5} markerEnd="url(#arch-arrow)">
+        {ARCH_EDGES.map((e, i) => (
+          <path key={i} d={e.d} strokeDasharray={e.async ? "5 6" : undefined} />
+        ))}
+      </g>
+
+      {/* Travelling data — a soft glow pass under a crisp one. */}
+      <g fill="none" stroke="var(--foreground)" strokeLinecap="round">
+        <g style={{ opacity: 0.4, filter: "blur(3px)" }}>
+          {ARCH_EDGES.map((e, i) => (
+            <path
+              key={i}
+              className="arch-ray"
+              d={e.d}
+              pathLength={100}
+              strokeWidth={5}
+              style={ray(e.dur, e.delay)}
+            />
+          ))}
+        </g>
+        <g strokeWidth={2}>
+          {ARCH_EDGES.map((e, i) => (
+            <path key={i} className="arch-ray" d={e.d} pathLength={100} style={ray(e.dur, e.delay)} />
+          ))}
+        </g>
+      </g>
+
+      {ARCH_NODES.map((n) => (
+        <ArchShapeNode key={n.id} node={n} />
+      ))}
+
+      {ARCH_EDGES.map((e, i) => (
+        <EdgeLabel key={i} x={e.lx} y={e.ly} text={e.label} />
+      ))}
+
+      {/* Legend */}
+      <g transform="translate(900, 808)">
+        <path d="M 0 -4 H 34" stroke="var(--border-strong)" strokeWidth={1.5} fill="none" />
+        <text x={44} y={0} fill="var(--muted)" fontFamily="var(--font-mono)" fontSize={11}>
+          during the call
+        </text>
+        <path
+          d="M 172 -4 H 206"
+          stroke="var(--border-strong)"
+          strokeWidth={1.5}
+          strokeDasharray="5 6"
+          fill="none"
+        />
+        <text x={216} y={0} fill="var(--muted)" fontFamily="var(--font-mono)" fontSize={11}>
+          after everyone leaves
+        </text>
+      </g>
+    </svg>
+  );
+}
+
+/* The same graph, walked in order, for screens too narrow to hold the diagram.
+   Sideways-scrolling a 1000px canvas on a phone just hides half the system, so
+   the zones become headers and the edges become the rail down the left. */
+const ARCH_STEPS: {
+  zone?: string;
+  t: string;
+  cap: string;
+  edge?: string;
+  async?: boolean;
+}[] = [
+  {
+    zone: "Client",
+    t: "Browser  × N",
+    cap: "Records its own microphone in short chunks — capture never leaves the tab.",
+    edge: "WebSocket · JWT   ·   WebRTC · SRTP",
+  },
+  {
+    zone: "Real-time edge",
+    t: "Signalling gateway + media relay",
+    cap: "Forwards streams between peers. Nothing joins the call and nothing records it.",
+    edge: "enqueued when the last participant leaves",
+    async: true,
+  },
+  {
+    zone: "Async pipeline — runs after the call",
+    t: "Message broker",
+    cap: "One job per stage, retried on failure.",
+    edge: "batch",
+    async: true,
+  },
+  {
+    t: "Speech-to-text",
+    cap: "Chunks stitched into one speaker-labelled transcript.",
+    edge: "audio",
+    async: true,
+  },
+  { t: "Object store", cap: "Archived audio.", edge: "transcript", async: true },
+  {
+    t: "LLM",
+    cap: "Drafts summary, decisions and action items.",
+    edge: "persist",
+    async: true,
+  },
+  {
+    zone: "Data",
+    t: "Database → PDF export",
+    cap: "Notes are stored, then rendered for download.",
+    edge: "notes + PDF · HTTPS",
+    async: true,
+  },
+  { t: "Back in your browser", cap: "Ready to read, share, or export." },
+];
+
+function ArchSteps() {
+  return (
+    <ol className="mt-10 lg:hidden">
+      {ARCH_STEPS.map((step) => (
+        <li key={step.t}>
+          {step.zone && (
+            <div className="mb-3 font-mono text-[10px] uppercase tracking-[0.14em] text-muted">
+              {step.zone}
+            </div>
+          )}
+
+          <div className="rounded-[14px] border border-border-strong bg-surface px-4 py-3.5">
+            <div className="font-display text-[15px] font-semibold tracking-tight text-foreground">
+              {step.t}
+            </div>
+            <p className="mt-1.5 text-[13px] leading-[1.5] text-tertiary">{step.cap}</p>
+          </div>
+
+          {step.edge && (
+            <div className="flex items-stretch gap-3 py-2 pl-5">
+              {/* The rail: dashed once the work has left the call. */}
+              <span
+                className={`w-px shrink-0 ${step.async ? "border-l border-dashed border-border-strong" : "bg-border-strong"}`}
+                aria-hidden
+              />
+              <span className="py-2 font-mono text-[11px] leading-[1.4] text-tertiary">
+                {step.edge}
+              </span>
+            </div>
+          )}
+        </li>
+      ))}
+    </ol>
+  );
+}
+
+function Architecture() {
+  return (
+    <section className={`${SHELL} pb-16 pt-8`}>
+      <div data-reveal className="mx-auto max-w-[720px] text-center">
+        <Eyebrow>Under the hood</Eyebrow>
+        <h2
+          className="mt-4 font-display font-semibold text-foreground"
+          style={{ fontSize: "clamp(28px, 3.4vw, 42px)", lineHeight: 1.08, letterSpacing: "-0.03em" }}
+        >
+          How a meeting becomes a document.
+        </h2>
+        <p className="mx-auto mt-4 max-w-[560px] text-[15px] leading-[1.6] text-secondary md:text-[16px]">
+          The call and the write-up are two different systems. Everything solid
+          happens live, in the room. Everything dashed happens on a queue after
+          the last person has hung up, so a slow model never slows a meeting.
+        </p>
+      </div>
+
+      {/* Scrolls sideways on phones rather than shrinking the labels away. */}
+      {/* Phones get the stacked walk-through; the canvas only appears once
+          there is room for its labels to stay legible. */}
+      <ArchSteps />
+
+      <div
+        data-reveal
+        style={{ transitionDelay: "0.1s" }}
+        className="mt-12 hidden overflow-x-auto pb-2 [scrollbar-width:thin] lg:block"
+      >
+        <ArchDiagram />
+      </div>
+
+      <div data-reveal style={{ transitionDelay: "0.16s" }} className="mt-8 flex flex-wrap justify-center gap-2">
+        <Pill>
+          <Icon name="video" size={12} /> WebRTC media server
+        </Pill>
+        <Pill>
+          <Icon name="mic" size={12} /> Speaker-aware speech-to-text
+        </Pill>
+        <Pill>
+          <Icon name="layers" size={12} /> Queue-driven pipeline
+        </Pill>
+        <Pill>
+          <Icon name="sparkle" size={12} /> LLM write-up, with a fallback model
+        </Pill>
+        <Pill>
+          <Icon name="fileText" size={12} /> PDF export
+        </Pill>
+      </div>
+    </section>
+  );
+}
 
 interface FeatureCardProps {
   img: string;
@@ -876,6 +1430,7 @@ export function LandingPage() {
       <LandingNav />
       <Hero />
       <NotesShowcase />
+      <Architecture />
       <Features />
       <Workflow />
       <CTABand />
